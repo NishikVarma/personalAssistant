@@ -1,7 +1,9 @@
+pub mod ai;
 pub mod application;
 pub mod contact;
 pub mod profile;
 
+pub use ai::*;
 pub use application::*;
 pub use contact::*;
 pub use profile::*;

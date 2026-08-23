@@ -4,9 +4,9 @@ pub mod error;
 pub mod llm;
 pub mod models;
 mod state;
-
 use tauri::Manager;
 
+use crate::llm::secrets::KeyringStore;
 use crate::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,7 +16,11 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let (pool, db_path) = tauri::async_runtime::block_on(db::init(data_dir))?;
-            app.manage(AppState { pool, db_path });
+            app.manage(AppState {
+                pool,
+                db_path,
+                secrets: std::sync::Arc::new(KeyringStore::new()),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,6 +86,11 @@ pub fn run() {
             commands::applications::application_update,
             commands::applications::application_set_status,
             commands::applications::application_delete,
+            commands::ai::ai_get_config,
+            commands::ai::ai_set_model,
+            commands::ai::ai_set_api_key,
+            commands::ai::ai_clear_api_key,
+            commands::ai::ai_test_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
