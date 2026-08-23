@@ -294,6 +294,18 @@ export interface ApplicationInput {
   notes: string;
 }
 
+export interface AiConfig {
+  model: string;
+  hasApiKey: boolean;
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  latencyMs: number | null;
+  error: string | null;
+  model: string;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -411,5 +423,13 @@ export const ipc = {
     setStatus: (id: number, status: ApplicationStatus) =>
       invoke<Application>("application_set_status", { id, status }),
     remove: (id: number) => invoke<boolean>("application_delete", { id }),
+  },
+
+  ai: {
+    getConfig: () => invoke<AiConfig>("ai_get_config"),
+    setModel: (model: string) => invoke<void>("ai_set_model", { model }),
+    setApiKey: (apiKey: string) => invoke<void>("ai_set_api_key", { apiKey }),
+    clearApiKey: () => invoke<boolean>("ai_clear_api_key"),
+    testConnection: () => invoke<AiTestResult>("ai_test_connection"),
   },
 };

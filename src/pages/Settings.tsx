@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import DeleteButton from "@/components/profile/DeleteButton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +11,133 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ipc, type AppInfo } from "@/lib/ipc";
+import { ipc, type AiConfig, type AiTestResult, type AppInfo } from "@/lib/ipc";
+
+function AiProviderCard() {
+  const [config, setConfig] = useState<AiConfig | null>(null);
+  const [model, setModel] = useState("");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [testResult, setTestResult] = useState<AiTestResult | null>(null);
+
+  useEffect(() => {
+    ipc.ai
+      .getConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        setModel(cfg.model);
+      })
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  const reloadConfig = async () => {
+    const cfg = await ipc.ai.getConfig();
+    setConfig(cfg);
+    setModel(cfg.model);
+    return cfg;
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await ipc.ai.setModel(model);
+      if (apiKeyInput.trim()) {
+        await ipc.ai.setApiKey(apiKeyInput);
+        setApiKeyInput("");
+      }
+      await reloadConfig();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setBusy(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      setTestResult(await ipc.ai.testConnection());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>AI provider</CardTitle>
+        <CardDescription>
+          Gemini API access. The key is stored in your operating system's secure credential
+          storage — never in the database.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="ai-model">Model</Label>
+            <Input
+              id="ai-model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="gemini-2.5-flash"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ai-key">API key</Label>
+            <Input
+              id="ai-key"
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder={config?.hasApiKey ? "Stored — leave blank to keep" : "Paste API key"}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="animate-spin" /> : null} Save
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={() => void testConnection()}>
+            Test connection
+          </Button>
+          {config?.hasApiKey ? (
+            <DeleteButton
+              confirmLabel="Remove key"
+              cancelLabel="Keep key"
+              onConfirm={async () => {
+                await ipc.ai.clearApiKey();
+                setTestResult(null);
+                await reloadConfig();
+              }}
+            />
+          ) : null}
+          {testResult ? (
+            testResult.ok ? (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Connected{testResult.latencyMs != null ? ` (${testResult.latencyMs} ms)` : ""}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs text-destructive">
+                <XCircle className="h-3.5 w-3.5" /> {testResult.error}
+              </span>
+            )
+          ) : null}
+          {error ? (
+            <span className="text-xs text-destructive">{error}</span>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -59,11 +186,13 @@ export default function Settings() {
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connection status and local preferences. Secrets move to the OS keychain in Phase 8.
+          AI provider and local preferences. Secrets are stored in the OS keychain.
         </p>
       </header>
 
       <div className="space-y-6">
+        <AiProviderCard />
+
         <Card>
           <CardHeader>
             <CardTitle>Database</CardTitle>
