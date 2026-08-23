@@ -202,6 +202,39 @@ export interface LinkInput {
   kind: LinkKind;
 }
 
+export interface Contact {
+  id: number;
+  name: string;
+  email: string;
+  organization: string | null;
+  roleTitle: string | null;
+  linkedinUrl: string | null;
+  notes: string;
+  lastContactedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactInput {
+  name: string;
+  email: string;
+  organization: string | null;
+  roleTitle: string | null;
+  linkedinUrl: string | null;
+  notes: string;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+  color: string | null;
+}
+
+export interface TagInput {
+  name: string;
+  color: string | null;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -290,5 +323,23 @@ export const ipc = {
     create: (input: LinkInput) => invoke<Link>("link_create", { input }),
     update: (id: number, input: LinkInput) => invoke<Link>("link_update", { id, input }),
     remove: (id: number) => invoke<boolean>("link_delete", { id }),
+  },
+
+  contact: {
+    list: (search = "") => invoke<Contact[]>("contact_list", { search }),
+    create: (input: ContactInput) => invoke<Contact>("contact_create", { input }),
+    update: (id: number, input: ContactInput) => invoke<Contact>("contact_update", { id, input }),
+    setLastContacted: (id: number, lastContactedAt: string | null) =>
+      invoke<void>("contact_set_last_contacted", { id, lastContactedAt }),
+    remove: (id: number) => invoke<boolean>("contact_delete", { id }),
+    listTags: (contactId: number) => invoke<Tag[]>("contact_list_tags", { contactId }),
+    replaceTags: (contactId: number, tagIds: number[]) =>
+      invoke<void>("contact_replace_tags", { contactId, tagIds }),
+  },
+
+  tag: {
+    list: () => invoke<Tag[]>("tag_list"),
+    create: (input: TagInput) => invoke<Tag>("tag_create", { input }),
+    remove: (id: number) => invoke<boolean>("tag_delete", { id }),
   },
 };
