@@ -306,6 +306,64 @@ export interface AiTestResult {
   model: string;
 }
 
+export type EmailType =
+  | "cold_outreach"
+  | "job_application"
+  | "referral_request"
+  | "follow_up"
+  | "internship_inquiry"
+  | "application_status";
+
+export const EMAIL_TYPES: EmailType[] = [
+  "cold_outreach",
+  "job_application",
+  "referral_request",
+  "follow_up",
+  "internship_inquiry",
+  "application_status",
+];
+
+export type EmailStatus = "draft" | "edited" | "approved" | "sent" | "discarded";
+
+export interface GeneratedEmail {
+  id: number;
+  applicationId: number | null;
+  contactId: number | null;
+  emailType: EmailType;
+  subject: string | null;
+  body: string;
+  provider: string | null;
+  model: string | null;
+  status: EmailStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GeneratedEmailInput {
+  applicationId: number | null;
+  contactId: number | null;
+  emailType: EmailType;
+  subject: string | null;
+  body: string;
+}
+
+export interface EmailDraftRequest {
+  recipientEmail: string;
+  recipientName: string | null;
+  company: string | null;
+  role: string | null;
+  jobDescription: string | null;
+  additionalContext: string | null;
+  emailType: EmailType;
+  applicationId: number | null;
+  contactId: number | null;
+}
+
+export interface ExtractedContact {
+  name: string | null;
+  organization: string | null;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -431,5 +489,21 @@ export const ipc = {
     setApiKey: (apiKey: string) => invoke<void>("ai_set_api_key", { apiKey }),
     clearApiKey: () => invoke<boolean>("ai_clear_api_key"),
     testConnection: () => invoke<AiTestResult>("ai_test_connection"),
+    generateEmail: (request: EmailDraftRequest) =>
+      invoke<GeneratedEmail>("ai_generate_email", { request }),
+    extractContact: (email: string) => invoke<ExtractedContact>("ai_extract_contact", { email }),
+  },
+
+  generatedEmail: {
+    list: (status?: EmailStatus | null) =>
+      invoke<GeneratedEmail[]>("generated_email_list", { status: status ?? undefined }),
+    get: (id: number) => invoke<GeneratedEmail>("generated_email_get", { id }),
+    create: (input: GeneratedEmailInput) =>
+      invoke<GeneratedEmail>("generated_email_create", { input }),
+    update: (id: number, subject: string | null, body: string) =>
+      invoke<GeneratedEmail>("generated_email_update", { id, subject, body }),
+    setStatus: (id: number, status: EmailStatus) =>
+      invoke<GeneratedEmail>("generated_email_set_status", { id, status }),
+    remove: (id: number) => invoke<boolean>("generated_email_delete", { id }),
   },
 };
