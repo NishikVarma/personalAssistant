@@ -6,9 +6,289 @@ export interface AppInfo {
   schemaVersion: number;
 }
 
+export type ProfileEntityType = "project" | "experience";
+
+export interface UserProfile {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserProfileInput {
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+}
+
+export interface Education {
+  id: number;
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  startDate: string | null;
+  endDate: string | null;
+  grade: string | null;
+  location: string | null;
+  details: string;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EducationInput {
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  startDate: string | null;
+  endDate: string | null;
+  grade: string | null;
+  location: string | null;
+  details: string;
+}
+
+export type EmploymentType =
+  | "internship"
+  | "full_time"
+  | "part_time"
+  | "contract"
+  | "freelance";
+
+export interface Experience {
+  id: number;
+  organization: string;
+  title: string;
+  employmentType: EmploymentType;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  currentlyWorking: boolean;
+  description: string;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExperienceInput {
+  organization: string;
+  title: string;
+  employmentType: EmploymentType;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  currentlyWorking: boolean;
+  description: string;
+}
+
+export type ProjectStatus = "ongoing" | "completed" | "archived";
+
+export interface Project {
+  id: number;
+  name: string;
+  description: string;
+  repoUrl: string | null;
+  liveUrl: string | null;
+  status: ProjectStatus;
+  startedOn: string | null;
+  endedOn: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectInput {
+  name: string;
+  description: string;
+  repoUrl: string | null;
+  liveUrl: string | null;
+  status: ProjectStatus;
+  startedOn: string | null;
+  endedOn: string | null;
+}
+
+export type SkillCategory =
+  | "language"
+  | "framework"
+  | "tool"
+  | "database"
+  | "cloud"
+  | "soft_skill"
+  | "other";
+
+export interface Skill {
+  id: number;
+  name: string;
+  category: SkillCategory;
+  createdAt: string;
+}
+
+export interface SkillInput {
+  name: string;
+  category: SkillCategory;
+}
+
+export interface Bullet {
+  id: number;
+  entityType: ProfileEntityType;
+  entityId: number;
+  content: string;
+  verified: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BulletInput {
+  content: string;
+  displayOrder: number;
+}
+
+export interface Certification {
+  id: number;
+  name: string;
+  issuer: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialUrl: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CertificationInput {
+  name: string;
+  issuer: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialUrl: string | null;
+}
+
+export interface Achievement {
+  id: number;
+  title: string;
+  description: string;
+  date: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AchievementInput {
+  title: string;
+  description: string;
+  date: string | null;
+}
+
+export type LinkKind = "linkedin" | "github" | "portfolio" | "other";
+
+export interface Link {
+  id: number;
+  label: string;
+  url: string;
+  kind: LinkKind;
+  createdAt: string;
+}
+
+export interface LinkInput {
+  label: string;
+  url: string;
+  kind: LinkKind;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
   setSetting: (key: string, value: string) => invoke<void>("set_setting", { key, value }),
   deleteSetting: (key: string) => invoke<boolean>("delete_setting", { key }),
+
+  profile: {
+    get: () => invoke<UserProfile>("profile_get"),
+    update: (input: UserProfileInput) => invoke<UserProfile>("profile_update", { input }),
+    setVerified: (verified: boolean) => invoke<void>("profile_set_verified", { verified }),
+  },
+
+  education: {
+    list: () => invoke<Education[]>("education_list"),
+    create: (input: EducationInput) => invoke<Education>("education_create", { input }),
+    update: (id: number, input: EducationInput) =>
+      invoke<Education>("education_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("education_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("education_delete", { id }),
+  },
+
+  experience: {
+    list: () => invoke<Experience[]>("experience_list"),
+    create: (input: ExperienceInput) => invoke<Experience>("experience_create", { input }),
+    update: (id: number, input: ExperienceInput) =>
+      invoke<Experience>("experience_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("experience_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("experience_delete", { id }),
+  },
+
+  project: {
+    list: () => invoke<Project[]>("project_list"),
+    create: (input: ProjectInput) => invoke<Project>("project_create", { input }),
+    update: (id: number, input: ProjectInput) => invoke<Project>("project_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("project_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("project_delete", { id }),
+  },
+
+  skill: {
+    list: () => invoke<Skill[]>("skill_list"),
+    create: (input: SkillInput) => invoke<Skill>("skill_create", { input }),
+    update: (id: number, input: SkillInput) => invoke<Skill>("skill_update", { id, input }),
+    remove: (id: number) => invoke<boolean>("skill_delete", { id }),
+    listForEntity: (entityType: ProfileEntityType, entityId: number) =>
+      invoke<Skill[]>("skill_list_for_entity", { entityType, entityId }),
+    replaceForEntity: (entityType: ProfileEntityType, entityId: number, skillIds: number[]) =>
+      invoke<void>("skill_replace_for_entity", { entityType, entityId, skillIds }),
+  },
+
+  bullet: {
+    listForEntity: (entityType: ProfileEntityType, entityId: number) =>
+      invoke<Bullet[]>("bullet_list_for_entity", { entityType, entityId }),
+    create: (entityType: ProfileEntityType, entityId: number, input: BulletInput) =>
+      invoke<Bullet>("bullet_create", { entityType, entityId, input }),
+    update: (id: number, input: BulletInput) => invoke<Bullet>("bullet_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("bullet_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("bullet_delete", { id }),
+  },
+
+  certification: {
+    list: () => invoke<Certification[]>("certification_list"),
+    create: (input: CertificationInput) => invoke<Certification>("certification_create", { input }),
+    update: (id: number, input: CertificationInput) =>
+      invoke<Certification>("certification_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("certification_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("certification_delete", { id }),
+  },
+
+  achievement: {
+    list: () => invoke<Achievement[]>("achievement_list"),
+    create: (input: AchievementInput) => invoke<Achievement>("achievement_create", { input }),
+    update: (id: number, input: AchievementInput) =>
+      invoke<Achievement>("achievement_update", { id, input }),
+    setVerified: (id: number, verified: boolean) =>
+      invoke<void>("achievement_set_verified", { id, verified }),
+    remove: (id: number) => invoke<boolean>("achievement_delete", { id }),
+  },
+
+  link: {
+    list: () => invoke<Link[]>("link_list"),
+    create: (input: LinkInput) => invoke<Link>("link_create", { input }),
+    update: (id: number, input: LinkInput) => invoke<Link>("link_update", { id, input }),
+    remove: (id: number) => invoke<boolean>("link_delete", { id }),
+  },
 };
