@@ -100,8 +100,20 @@ the OS keyring; Gmail passwords are never stored).
 - contacts (10): contact_list(search)/create/update/delete/set_last_contacted;
   tag_list/create/delete; contact_list_tags/replace_tags
 - applications (5): application_list(status filter)/create/update/set_status/delete
+- ai (5): ai_get_config / set_model / set_api_key / clear_api_key / test_connection
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
+
+## AI Layer
+
+- `LlmProvider` trait (async `complete(prompt) -> String`) in `src-tauri/src/llm/mod.rs`;
+  `GeminiProvider` calls the Gemini REST `generateContent` endpoint via reqwest (rustls).
+- API keys live in the OS keyring behind the `SecretStore` abstraction
+  (`llm/secrets.rs`: `KeyringStore` for Windows Credential Manager / freedesktop Secret
+  Service, `MemoryStore` for tests). Keys are never stored in SQLite.
+- The model name is a plain setting (`ai.model`, default `gemini-2.5-flash`).
+- A live network round-trip test exists but is `#[ignore]`-gated: run manually with
+  `GEMINI_API_KEY=... cargo test -- --ignored`.
 
 ## Implemented Capabilities (as of this spec)
 
@@ -114,8 +126,8 @@ Development plan from the original project brief — 17 incremental steps:
 | 3  | Career profile                                  | Done   |
 | 4  | Contact management                              | Done   |
 | 5  | Basic application tracking                      | Done   |
-| 6  | Gemini integration (LLMProvider implementation) | Next   |
-| 7  | Single-email generation                         | –      |
+| 6  | Gemini integration (LLMProvider implementation) | Done   |
+| 7  | Single-email generation                         | Next   |
 | 8  | Gmail OAuth and sending                         | –      |
 | 9  | Email history                                   | –      |
 | 10 | Follow-up scheduling/notifications              | –      |
