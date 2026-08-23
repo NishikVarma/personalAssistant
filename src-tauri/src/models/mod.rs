@@ -1,6 +1,8 @@
+pub mod application;
 pub mod contact;
 pub mod profile;
 
+pub use application::*;
 pub use contact::*;
 pub use profile::*;
 
