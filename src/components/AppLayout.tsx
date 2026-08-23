@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { SECTIONS } from "@/lib/sections";
 import { ipc } from "@/lib/ipc";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
 
 export default function AppLayout() {
@@ -41,7 +42,10 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="px-5 py-4 text-xs text-muted-foreground">{version}</div>
+        <div className="flex items-center justify-between gap-2 px-4 py-4">
+          <span className="text-xs text-muted-foreground">{version}</span>
+          <ThemeToggle />
+        </div>
       </aside>
       <main className="flex-1 overflow-y-auto p-8">
         <Outlet />
