@@ -67,6 +67,16 @@ pub fn run() {
             commands::profile::link_create,
             commands::profile::link_update,
             commands::profile::link_delete,
+            commands::contacts::contact_list,
+            commands::contacts::contact_create,
+            commands::contacts::contact_update,
+            commands::contacts::contact_set_last_contacted,
+            commands::contacts::contact_delete,
+            commands::contacts::tag_list,
+            commands::contacts::tag_create,
+            commands::contacts::tag_delete,
+            commands::contacts::contact_list_tags,
+            commands::contacts::contact_replace_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

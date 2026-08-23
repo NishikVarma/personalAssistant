@@ -1,6 +1,7 @@
 pub mod achievements_repo;
 pub mod bullets_repo;
 pub mod certifications_repo;
+pub mod contacts_repo;
 pub mod education_repo;
 pub mod experience_repo;
 pub mod links_repo;
@@ -8,6 +9,7 @@ pub mod profile_repo;
 pub mod projects_repo;
 pub mod settings_repo;
 pub mod skills_repo;
+pub mod tags_repo;
 
 use std::path::PathBuf;
 

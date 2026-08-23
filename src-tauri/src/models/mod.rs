@@ -1,5 +1,7 @@
+pub mod contact;
 pub mod profile;
 
+pub use contact::*;
 pub use profile::*;
 
 use serde::{Deserialize, Serialize};
