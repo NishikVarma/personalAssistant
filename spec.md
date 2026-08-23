@@ -100,7 +100,9 @@ the OS keyring; Gmail passwords are never stored).
 - contacts (10): contact_list(search)/create/update/delete/set_last_contacted;
   tag_list/create/delete; contact_list_tags/replace_tags
 - applications (5): application_list(status filter)/create/update/set_status/delete
-- ai (5): ai_get_config / set_model / set_api_key / clear_api_key / test_connection
+- ai (7): ai_get_config / set_model / set_api_key / clear_api_key / test_connection /
+  generate_email / extract_contact
+- emails (6): generated_email_list(status filter)/get/create/update/set_status/delete
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -115,6 +117,18 @@ Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`
 - A live network round-trip test exists but is `#[ignore]`-gated: run manually with
   `GEMINI_API_KEY=... cargo test -- --ignored`.
 
+## Email Generation Flow (implemented)
+
+`ai_generate_email` assembles a prompt from (a) the request details (recipient, company,
+role, job description, context, email type) and (b) a deterministic profile snapshot built
+from every filled-in career-profile table (`db/profile_snapshot.rs`, capped ~8k chars). The
+prompt forbids inventing anything absent from that snapshot. The model returns strict JSON
+`{subject, body}`, parsed tolerantly (`llm/email_prompt.rs`). Drafts persist in
+`generated_emails` with provider/model provenance; `draft → edited → approved → sent`
+transitions are validated in the repo (`sent`/`discarded` are terminal). Existing contacts
+are auto-linked by exact email match. Sending is Phase 8 — until then the UI offers copy,
+save-edit and approve only.
+
 ## Implemented Capabilities (as of this spec)
 
 Development plan from the original project brief — 17 incremental steps:
@@ -127,8 +141,8 @@ Development plan from the original project brief — 17 incremental steps:
 | 4  | Contact management                              | Done   |
 | 5  | Basic application tracking                      | Done   |
 | 6  | Gemini integration (LLMProvider implementation) | Done   |
-| 7  | Single-email generation                         | Next   |
-| 8  | Gmail OAuth and sending                         | –      |
+| 7  | Single-email generation                         | Done   |
+| 8  | Gmail OAuth and sending                         | Next   |
 | 9  | Email history                                   | –      |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
