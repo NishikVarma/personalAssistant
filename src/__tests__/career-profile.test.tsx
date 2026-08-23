@@ -84,7 +84,8 @@ describe("CareerProfile", () => {
       "Achievements",
       "Links",
     ]) {
-      expect(screen.getByText(section)).toBeTruthy();
+      // section names appear in both the sub-nav and the card titles
+      expect(screen.getAllByText(section).length).toBeGreaterThan(0);
     }
   });
 
