@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Check, ClipboardCopy, Pencil, Sparkles, Wand2 } from "lucide-react";
+import { Check, ClipboardCopy, Mail, Pencil, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { copyText } from "@/lib/clipboard";
 import {
@@ -67,6 +69,7 @@ export default function Emails() {
   const [compose, setCompose] = useState<ComposeState>(EMPTY_COMPOSE);
   const [applications, setApplications] = useState<Application[]>([]);
   const [emails, setEmails] = useState<GeneratedEmail[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<GeneratedEmail | null>(null);
   const [subjectDraft, setSubjectDraft] = useState("");
   const [bodyDraft, setBodyDraft] = useState("");
@@ -79,7 +82,8 @@ export default function Emails() {
     ipc.generatedEmail
       .list()
       .then(setEmails)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -447,8 +451,17 @@ export default function Emails() {
         ) : null}
 
         <SectionCard title={`History${emails.length ? ` (${emails.length})` : ""}`}>
-          {emails.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No generated emails yet.</p>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-5/6" />
+            </div>
+          ) : emails.length === 0 ? (
+            <EmptyState
+              icon={Mail}
+              title="No generated emails yet"
+              description="Fill in the compose form above and let the AI draft your first email."
+            />
           ) : (
             <ul className="divide-y">
               {emails.map((email) => (

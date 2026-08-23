@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { shortDate } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
+import { Award } from "lucide-react";
 import VerifiedToggle from "@/components/profile/VerifiedToggle";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Certification, type CertificationInput } from "@/lib/ipc";
 
 const FIELDS = [
@@ -45,6 +48,7 @@ function toInput(values: FormValues): CertificationInput {
 
 export default function CertificationsSection() {
   const [items, setItems] = useState<Certification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
     { mode: "add" } | { mode: "edit"; item: Certification } | null
@@ -54,7 +58,8 @@ export default function CertificationsSection() {
     ipc.certification
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -70,8 +75,17 @@ export default function CertificationsSection() {
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 && !error ? (
-        <p className="text-sm text-muted-foreground">No certifications added yet.</p>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-4/5" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Award}
+          title="No certifications added yet"
+          description="Credentials the AI may cite; verify only what is real."
+        />
       ) : (
         <ul className="divide-y">
           {items.map((item) => (

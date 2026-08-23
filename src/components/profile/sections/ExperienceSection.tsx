@@ -3,12 +3,15 @@ import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EntityAttachments from "@/components/profile/EntityAttachments";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { EMPLOYMENT_TYPE_OPTIONS, labelFor, shortDate } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
 import VerifiedToggle from "@/components/profile/VerifiedToggle";
 import { Badge } from "@/components/ui/badge";
+import { Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Experience, type ExperienceInput, type EmploymentType } from "@/lib/ipc";
 
 const FIELDS = [
@@ -68,6 +71,7 @@ function toInput(values: FormValues): ExperienceInput {
 
 export default function ExperienceSection() {
   const [items, setItems] = useState<Experience[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Experience } | null>(
     null,
@@ -77,7 +81,8 @@ export default function ExperienceSection() {
     ipc.experience
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -93,8 +98,17 @@ export default function ExperienceSection() {
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 && !error ? (
-        <p className="text-sm text-muted-foreground">No experience added yet.</p>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-5/6" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Briefcase}
+          title="No experience added yet"
+          description="Internships and jobs with their verified resume bullets."
+        />
       ) : (
         <ul className="divide-y">
           {items.map((item) => (

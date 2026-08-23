@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { shortDate } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
 import VerifiedToggle from "@/components/profile/VerifiedToggle";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Achievement, type AchievementInput } from "@/lib/ipc";
 
 const FIELDS = [
@@ -38,6 +40,7 @@ function toInput(values: FormValues): AchievementInput {
 
 export default function AchievementsSection() {
   const [items, setItems] = useState<Achievement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
     { mode: "add" } | { mode: "edit"; item: Achievement } | null
@@ -47,7 +50,8 @@ export default function AchievementsSection() {
     ipc.achievement
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -63,8 +67,17 @@ export default function AchievementsSection() {
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 && !error ? (
-        <p className="text-sm text-muted-foreground">No achievements added yet.</p>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-4/5" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Trophy}
+          title="No achievements added yet"
+          description="Competitions, awards and recognitions worth mentioning."
+        />
       ) : (
         <ul className="divide-y">
           {items.map((item) => (

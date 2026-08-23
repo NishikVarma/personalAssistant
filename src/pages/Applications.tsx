@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Briefcase, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   APPLICATION_STATUSES,
   ipc,
@@ -89,6 +91,7 @@ function shortDate(value: string | null): string {
 export default function Applications() {
   const [apps, setApps] = useState<Application[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Application } | null>(
     null,
@@ -98,7 +101,8 @@ export default function Applications() {
     ipc.application
       .list(statusFilter === "all" ? null : (statusFilter as ApplicationStatus))
       .then(setApps)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -141,8 +145,17 @@ export default function Applications() {
         }
       >
         {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
-        {apps.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No applications yet.</p>
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-11/12" />
+          </div>
+        ) : apps.length === 0 ? (
+          <EmptyState
+            icon={Briefcase}
+            title="No applications yet"
+            description="Track every opportunity here with its status, dates and notes."
+          />
         ) : (
           <ul className="divide-y">
             {apps.map((app) => (

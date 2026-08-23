@@ -3,12 +3,15 @@ import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EntityAttachments from "@/components/profile/EntityAttachments";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { PROJECT_STATUS_OPTIONS, labelFor, shortDate } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
 import VerifiedToggle from "@/components/profile/VerifiedToggle";
 import { Badge } from "@/components/ui/badge";
+import { FolderGit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Project, type ProjectInput, type ProjectStatus } from "@/lib/ipc";
 
 const FIELDS = [
@@ -57,6 +60,7 @@ function toInput(values: FormValues): ProjectInput {
 
 export default function ProjectsSection() {
   const [items, setItems] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Project } | null>(
     null,
@@ -66,7 +70,8 @@ export default function ProjectsSection() {
     ipc.project
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -82,8 +87,17 @@ export default function ProjectsSection() {
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 && !error ? (
-        <p className="text-sm text-muted-foreground">No projects added yet.</p>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-5/6" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={FolderGit2}
+          title="No projects added yet"
+          description="Add each project once; the system reuses it across resumes and applications."
+        />
       ) : (
         <ul className="divide-y">
           {items.map((item) => (

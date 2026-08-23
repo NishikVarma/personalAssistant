@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import SectionCard from "@/components/profile/SectionCard";
 import VerifiedToggle from "@/components/profile/VerifiedToggle";
 import { Button } from "@/components/ui/button";
+import { GraduationCap } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Education, type EducationInput } from "@/lib/ipc";
 
 const FIELDS = [
@@ -57,9 +60,10 @@ function toInput(values: FormValues): EducationInput {
 
 export default function EducationSection() {
   const [items, setItems] = useState<Education[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
-    | { mode: "add" }
+    { mode: "add" }
     | { mode: "edit"; item: Education }
     | null
   >(null);
@@ -68,7 +72,8 @@ export default function EducationSection() {
     ipc.education
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -84,8 +89,17 @@ export default function EducationSection() {
       }
     >
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 && !error ? (
-        <p className="text-sm text-muted-foreground">No education added yet.</p>
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-4/5" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={GraduationCap}
+          title="No education added yet"
+          description="Degrees and programs the AI may reference in applications."
+        />
       ) : (
         <ul className="divide-y">
           {items.map((item) => (

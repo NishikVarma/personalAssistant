@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ContactTagsEditor from "@/components/contacts/ContactTagsEditor";
 import DeleteButton from "@/components/profile/DeleteButton";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, {
   emptyToNull,
   type FormValues,
@@ -12,6 +13,7 @@ import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Contact, type ContactInput } from "@/lib/ipc";
 
 const FIELDS = [
@@ -66,6 +68,7 @@ export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tags, setTags] = useState<Array<{ id: number; name: string; color: string | null }>>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Contact } | null>(
     null,
@@ -76,7 +79,8 @@ export default function Contacts() {
     ipc.contact
       .list(term)
       .then(setContacts)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   const reloadTags = () => ipc.tag.list().then(setTags).catch(() => setTags([]));
@@ -181,10 +185,22 @@ export default function Contacts() {
           }
         >
           {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
-          {contacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {search ? "No contacts match this search." : "No contacts added yet."}
-            </p>
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-11/12" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : contacts.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title={search ? "No matches" : "No contacts added yet"}
+              description={
+                search
+                  ? "Nobody matches this search."
+                  : "Recruiters and referrals you reach out to will live here."
+              }
+            />
           ) : (
             <ul className="divide-y">
               {contacts.map((contact) => (

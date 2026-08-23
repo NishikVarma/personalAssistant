@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
+import EmptyState from "@/components/EmptyState";
 import FormDialog, { type FieldDef, type FormValues } from "@/components/profile/FormDialog";
 import { SKILL_CATEGORY_OPTIONS, labelFor } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Skill, type SkillCategory, type SkillInput } from "@/lib/ipc";
 
 const FIELDS: FieldDef[] = [
@@ -31,6 +33,7 @@ function toInput(values: FormValues): SkillInput {
 
 export default function SkillsSection() {
   const [items, setItems] = useState<Skill[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Skill } | null>(null);
   const [quickName, setQuickName] = useState("");
@@ -41,7 +44,8 @@ export default function SkillsSection() {
     ipc.skill
       .list()
       .then(setItems)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   };
 
   useEffect(reload, []);
@@ -100,8 +104,18 @@ export default function SkillsSection() {
       </div>
 
       {error ? <p className="mb-2 text-sm text-destructive">{error}</p> : null}
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No skills added yet.</p>
+      {loading ? (
+        <div className="flex flex-wrap gap-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-6 w-20 rounded-4xl" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Wrench}
+          title="No skills added yet"
+          description="Attach these to projects and experience; the AI only claims skills listed here."
+        />
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map((skill) => (
