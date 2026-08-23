@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ipc, type Bullet, type ProfileEntityType } from "@/lib/ipc";
@@ -25,11 +26,14 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
 
   useEffect(reload, [entityType, entityId]);
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>, successMsg?: string) => {
     setBusy(true);
     try {
       await fn();
+      if (successMsg) toast.success(successMsg);
       reload();
+    } catch (e) {
+      toast.error(String(e));
     } finally {
       setBusy(false);
     }
@@ -44,7 +48,7 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
         displayOrder: bullets.length,
       });
       setDraft("");
-    });
+    }, "Bullet added");
   };
 
   return (
@@ -62,11 +66,13 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
                   onChange={(e) => setEditingDraft(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && editingDraft.trim()) {
-                      void run(() =>
-                        ipc.bullet.update(bullet.id, {
-                          content: editingDraft.trim(),
-                          displayOrder: bullet.displayOrder,
-                        }),
+                      void run(
+                        () =>
+                          ipc.bullet.update(bullet.id, {
+                            content: editingDraft.trim(),
+                            displayOrder: bullet.displayOrder,
+                          }),
+                        "Bullet updated",
                       ).then(() => setEditingId(null));
                     }
                     if (e.key === "Escape") setEditingId(null);
@@ -77,11 +83,13 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
                   size="icon-xs"
                   disabled={busy || !editingDraft.trim()}
                   onClick={() =>
-                    run(() =>
-                      ipc.bullet.update(bullet.id, {
-                        content: editingDraft.trim(),
-                        displayOrder: bullet.displayOrder,
-                      }),
+                    run(
+                      () =>
+                        ipc.bullet.update(bullet.id, {
+                          content: editingDraft.trim(),
+                          displayOrder: bullet.displayOrder,
+                        }),
+                      "Bullet updated",
                     ).then(() => setEditingId(null))
                   }
                 >
@@ -116,7 +124,10 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
                   className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                   disabled={busy}
                   onClick={() =>
-                    run(() => ipc.bullet.setVerified(bullet.id, !bullet.verified))
+                    run(
+                      () => ipc.bullet.setVerified(bullet.id, !bullet.verified),
+                      bullet.verified ? "Marked unverified" : "Marked verified",
+                    )
                   }
                   title={bullet.verified ? "Mark unverified" : "Mark verified"}
                 >
@@ -139,7 +150,7 @@ export default function BulletsEditor({ entityType, entityId }: BulletsEditorPro
                   size="icon-xs"
                   className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                   disabled={busy}
-                  onClick={() => run(() => ipc.bullet.remove(bullet.id))}
+                  onClick={() => run(() => ipc.bullet.remove(bullet.id), "Bullet deleted")}
                   title="Delete bullet"
                 >
                   <Trash2 />

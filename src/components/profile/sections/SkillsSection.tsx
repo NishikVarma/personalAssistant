@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import FormDialog, { type FieldDef, type FormValues } from "@/components/profile/FormDialog";
 import { SKILL_CATEGORY_OPTIONS, labelFor } from "@/components/profile/labels";
 import SectionCard from "@/components/profile/SectionCard";
@@ -51,9 +52,11 @@ export default function SkillsSection() {
     setError(null);
     try {
       await ipc.skill.create({ name: quickName.trim(), category: quickCategory });
+      toast.success(`Skill “${quickName.trim()}” added`);
       setQuickName("");
       reload();
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setBusy(false);
@@ -124,8 +127,13 @@ export default function SkillsSection() {
                 aria-label={`Remove ${skill.name}`}
                 className="rounded-full p-0.5 hover:bg-foreground/10"
                 onClick={async () => {
-                  await ipc.skill.remove(skill.id);
-                  reload();
+                  try {
+                    await ipc.skill.remove(skill.id);
+                    toast.success(`Skill “${skill.name}” removed`);
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               >
                 <X className="size-3" />
@@ -147,8 +155,10 @@ export default function SkillsSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.skill.create(toInput(values));
+              toast.success(`Skill “${toInput(values).name}” added`);
             } else {
               await ipc.skill.update(dialog.item.id, toInput(values));
+              toast.success("Skill updated");
             }
             reload();
           }}

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { SECTIONS } from "@/lib/sections";
 import { ipc } from "@/lib/ipc";
@@ -50,6 +51,7 @@ export default function AppLayout() {
       <main className="flex-1 overflow-y-auto p-8">
         <Outlet />
       </main>
+      <Toaster richColors position="bottom-right" closeButton />
     </div>
   );
 }

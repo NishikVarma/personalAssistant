@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EntityAttachments from "@/components/profile/EntityAttachments";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
@@ -112,8 +113,13 @@ export default function ProjectsSection() {
                   <VerifiedToggle
                     verified={item.verified}
                     onToggle={async () => {
-                      await ipc.project.setVerified(item.id, !item.verified);
-                      reload();
+                      try {
+                        await ipc.project.setVerified(item.id, !item.verified);
+                        toast.success(item.verified ? "Marked unverified" : "Marked verified");
+                        reload();
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
                     }}
                   />
                   <Button
@@ -126,8 +132,13 @@ export default function ProjectsSection() {
                   </Button>
                   <DeleteButton
                     onConfirm={async () => {
-                      await ipc.project.remove(item.id);
-                      reload();
+                      try {
+                        await ipc.project.remove(item.id);
+                        toast.success("Project deleted (bullets and skill links cleaned up)");
+                        reload();
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
                     }}
                   />
                 </div>
@@ -146,8 +157,10 @@ export default function ProjectsSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.project.create(toInput(values));
+              toast.success("Project added");
             } else {
               await ipc.project.update(dialog.item.id, toInput(values));
+              toast.success("Project updated");
             }
             reload();
           }}

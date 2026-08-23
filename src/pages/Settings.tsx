@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,10 +46,13 @@ function AiProviderCard() {
       await ipc.ai.setModel(model);
       if (apiKeyInput.trim()) {
         await ipc.ai.setApiKey(apiKeyInput);
+        toast.success("API key stored in the OS keychain");
         setApiKeyInput("");
       }
       await reloadConfig();
+      toast.success("AI settings saved");
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setBusy(false);
@@ -60,8 +64,15 @@ function AiProviderCard() {
     setError(null);
     setTestResult(null);
     try {
-      setTestResult(await ipc.ai.testConnection());
+      const result = await ipc.ai.testConnection();
+      setTestResult(result);
+      if (result.ok) {
+        toast.success(`Gemini reachable (${result.latencyMs ?? "?"} ms)`);
+      } else {
+        toast.error(result.error ?? "Connection failed");
+      }
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setBusy(false);
@@ -112,9 +123,14 @@ function AiProviderCard() {
               confirmLabel="Remove key"
               cancelLabel="Keep key"
               onConfirm={async () => {
-                await ipc.ai.clearApiKey();
-                setTestResult(null);
-                await reloadConfig();
+                try {
+                  await ipc.ai.clearApiKey();
+                  setTestResult(null);
+                  await reloadConfig();
+                  toast.success("API key removed from the keychain");
+                } catch (e) {
+                  toast.error(String(e));
+                }
               }}
             />
           ) : null}

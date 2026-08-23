@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import DeleteButton from "@/components/profile/DeleteButton";
 import FormDialog, { type FormValues } from "@/components/profile/FormDialog";
@@ -86,8 +87,13 @@ export default function LinksSection() {
               </Button>
               <DeleteButton
                 onConfirm={async () => {
-                  await ipc.link.remove(item.id);
-                  reload();
+                  try {
+                    await ipc.link.remove(item.id);
+                    toast.success("Link deleted");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
             </li>
@@ -105,8 +111,10 @@ export default function LinksSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.link.create(toInput(values));
+              toast.success("Link added");
             } else {
               await ipc.link.update(dialog.item.id, toInput(values));
+              toast.success("Link updated");
             }
             reload();
           }}

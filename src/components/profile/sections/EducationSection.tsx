@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import SectionCard from "@/components/profile/SectionCard";
@@ -105,8 +106,13 @@ export default function EducationSection() {
               <VerifiedToggle
                 verified={item.verified}
                 onToggle={async () => {
-                  await ipc.education.setVerified(item.id, !item.verified);
-                  reload();
+                  try {
+                    await ipc.education.setVerified(item.id, !item.verified);
+                    toast.success(item.verified ? "Marked unverified" : "Marked verified");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
               <Button
@@ -119,8 +125,13 @@ export default function EducationSection() {
               </Button>
               <DeleteButton
                 onConfirm={async () => {
-                  await ipc.education.remove(item.id);
-                  reload();
+                  try {
+                    await ipc.education.remove(item.id);
+                    toast.success("Education entry deleted");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
             </li>
@@ -136,8 +147,10 @@ export default function EducationSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.education.create(toInput(values));
+              toast.success("Education entry added");
             } else {
               await ipc.education.update(dialog.item.id, toInput(values));
+              toast.success("Education entry updated");
             }
             reload();
           }}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ContactTagsEditor from "@/components/contacts/ContactTagsEditor";
 import DeleteButton from "@/components/profile/DeleteButton";
@@ -92,10 +93,11 @@ export default function Contacts() {
     if (!newTag.trim()) return;
     try {
       await ipc.tag.create({ name: newTag.trim(), color: null });
+      toast.success(`Tag “${newTag.trim()}” created`);
       setNewTag("");
       reloadTags();
     } catch (e) {
-      setError(String(e));
+      toast.error(String(e));
     }
   };
 
@@ -125,9 +127,14 @@ export default function Contacts() {
                   aria-label={`Delete ${tag.name}`}
                   className="rounded-full p-0.5 hover:bg-foreground/10"
                   onClick={async () => {
-                    await ipc.tag.remove(tag.id);
-                    reloadTags();
-                    reloadContacts();
+                    try {
+                      await ipc.tag.remove(tag.id);
+                      toast.success(`Tag “${tag.name}” deleted`);
+                      reloadTags();
+                      reloadContacts();
+                    } catch (e) {
+                      toast.error(String(e));
+                    }
                   }}
                 >
                   <X className="size-3" />
@@ -223,8 +230,13 @@ export default function Contacts() {
                       </Button>
                       <DeleteButton
                         onConfirm={async () => {
-                          await ipc.contact.remove(contact.id);
-                          reloadContacts();
+                          try {
+                            await ipc.contact.remove(contact.id);
+                            toast.success("Contact deleted");
+                            reloadContacts();
+                          } catch (e) {
+                            toast.error(String(e));
+                          }
                         }}
                       />
                     </div>
@@ -256,8 +268,10 @@ export default function Contacts() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.contact.create(toInput(values));
+              toast.success("Contact added");
             } else {
               await ipc.contact.update(dialog.item.id, toInput(values));
+              toast.success("Contact updated");
             }
             reloadContacts();
           }}

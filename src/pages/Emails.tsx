@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, ClipboardCopy, Pencil, Sparkles, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +105,9 @@ export default function Emails() {
         recipientName: guess.name ?? compose.recipientName,
         company: guess.organization ?? compose.company,
       });
-      setNotice("Verified AI's best guess — correct it if needed.");
+      toast.message("Best guess filled in", {
+        description: "Verify the name and company before generating.",
+      });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -134,8 +137,9 @@ export default function Emails() {
       });
       loadDraft(created);
       reloadList();
-      setNotice("Review the draft below — the AI only used your verified profile.");
+      toast.success("Draft generated — review it below");
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setGenerating(false);
@@ -165,7 +169,9 @@ export default function Emails() {
       );
       setSelected(saved);
       reloadList();
+      toast.success("Draft saved");
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setBusy(false);
@@ -189,7 +195,13 @@ export default function Emails() {
       const updated = await ipc.generatedEmail.setStatus(selected.id, status);
       setSelected(updated);
       reloadList();
+      if (status === "approved") {
+        toast.success("Draft approved — ready to send once Gmail is connected");
+      } else {
+        toast.success(`Marked ${STATUS_LABELS[status].toLowerCase()}`);
+      }
     } catch (e) {
+      toast.error(String(e));
       setError(String(e));
     } finally {
       setBusy(false);
@@ -199,7 +211,11 @@ export default function Emails() {
   const copyBody = async () => {
     if (!selected) return;
     const ok = await copyText(bodyDraft);
-    setNotice(ok ? "Copied to clipboard." : "Could not access the clipboard.");
+    if (ok) {
+      toast.success("Copied to clipboard");
+    } else {
+      toast.error("Could not access the clipboard");
+    }
   };
 
   return (
@@ -410,9 +426,14 @@ export default function Emails() {
                       cancelLabel="Keep"
                       onConfirm={async () => {
                         if (!selected) return;
-                        await ipc.generatedEmail.remove(selected.id);
-                        setSelected(null);
-                        reloadList();
+                        try {
+                          await ipc.generatedEmail.remove(selected.id);
+                          toast.success("Draft deleted");
+                          setSelected(null);
+                          reloadList();
+                        } catch (e) {
+                          toast.error(String(e));
+                        }
                       }}
                     />
                   </>

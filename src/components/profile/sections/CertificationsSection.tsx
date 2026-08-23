@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { shortDate } from "@/components/profile/labels";
@@ -90,8 +91,13 @@ export default function CertificationsSection() {
               <VerifiedToggle
                 verified={item.verified}
                 onToggle={async () => {
-                  await ipc.certification.setVerified(item.id, !item.verified);
-                  reload();
+                  try {
+                    await ipc.certification.setVerified(item.id, !item.verified);
+                    toast.success(item.verified ? "Marked unverified" : "Marked verified");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
               <Button
@@ -104,8 +110,13 @@ export default function CertificationsSection() {
               </Button>
               <DeleteButton
                 onConfirm={async () => {
-                  await ipc.certification.remove(item.id);
-                  reload();
+                  try {
+                    await ipc.certification.remove(item.id);
+                    toast.success("Certification deleted");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
             </li>
@@ -121,8 +132,10 @@ export default function CertificationsSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.certification.create(toInput(values));
+              toast.success("Certification added");
             } else {
               await ipc.certification.update(dialog.item.id, toInput(values));
+              toast.success("Certification updated");
             }
             reload();
           }}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
 import { shortDate } from "@/components/profile/labels";
@@ -84,8 +85,13 @@ export default function AchievementsSection() {
               <VerifiedToggle
                 verified={item.verified}
                 onToggle={async () => {
-                  await ipc.achievement.setVerified(item.id, !item.verified);
-                  reload();
+                  try {
+                    await ipc.achievement.setVerified(item.id, !item.verified);
+                    toast.success(item.verified ? "Marked unverified" : "Marked verified");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
               <Button
@@ -98,8 +104,13 @@ export default function AchievementsSection() {
               </Button>
               <DeleteButton
                 onConfirm={async () => {
-                  await ipc.achievement.remove(item.id);
-                  reload();
+                  try {
+                    await ipc.achievement.remove(item.id);
+                    toast.success("Achievement deleted");
+                    reload();
+                  } catch (e) {
+                    toast.error(String(e));
+                  }
                 }}
               />
             </li>
@@ -115,8 +126,10 @@ export default function AchievementsSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.achievement.create(toInput(values));
+              toast.success("Achievement added");
             } else {
               await ipc.achievement.update(dialog.item.id, toInput(values));
+              toast.success("Achievement updated");
             }
             reload();
           }}

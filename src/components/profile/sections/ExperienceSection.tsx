@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EntityAttachments from "@/components/profile/EntityAttachments";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
@@ -122,8 +123,13 @@ export default function ExperienceSection() {
                   <VerifiedToggle
                     verified={item.verified}
                     onToggle={async () => {
-                      await ipc.experience.setVerified(item.id, !item.verified);
-                      reload();
+                      try {
+                        await ipc.experience.setVerified(item.id, !item.verified);
+                        toast.success(item.verified ? "Marked unverified" : "Marked verified");
+                        reload();
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
                     }}
                   />
                   <Button
@@ -136,8 +142,13 @@ export default function ExperienceSection() {
                   </Button>
                   <DeleteButton
                     onConfirm={async () => {
-                      await ipc.experience.remove(item.id);
-                      reload();
+                      try {
+                        await ipc.experience.remove(item.id);
+                        toast.success("Experience deleted (bullets and skill links cleaned up)");
+                        reload();
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
                     }}
                   />
                 </div>
@@ -160,8 +171,10 @@ export default function ExperienceSection() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.experience.create(toInput(values));
+              toast.success("Experience added");
             } else {
               await ipc.experience.update(dialog.item.id, toInput(values));
+              toast.success("Experience updated");
             }
             reload();
           }}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import DeleteButton from "@/components/profile/DeleteButton";
 import FormDialog, { emptyToNull, type FormValues } from "@/components/profile/FormDialog";
@@ -181,7 +182,13 @@ export default function Applications() {
                       onChange={(e) => {
                         void ipc.application
                           .setStatus(app.id, e.target.value as ApplicationStatus)
-                          .then(() => reload());
+                          .then(() => {
+                            toast.success(
+                              `${app.company} moved to ${STATUS_LABELS[e.target.value as ApplicationStatus]}`,
+                            );
+                            reload();
+                          })
+                          .catch((err) => toast.error(String(err)));
                       }}
                     >
                       {APPLICATION_STATUSES.map((status) => (
@@ -200,8 +207,13 @@ export default function Applications() {
                     </Button>
                     <DeleteButton
                       onConfirm={async () => {
-                        await ipc.application.remove(app.id);
-                        reload();
+                        try {
+                          await ipc.application.remove(app.id);
+                          toast.success("Application deleted");
+                          reload();
+                        } catch (e) {
+                          toast.error(String(e));
+                        }
                       }}
                     />
                   </div>
@@ -233,8 +245,10 @@ export default function Applications() {
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.application.create(toInput(values));
+              toast.success("Application added");
             } else {
               await ipc.application.update(dialog.item.id, toInput(values));
+              toast.success("Application updated");
             }
             reload();
           }}
