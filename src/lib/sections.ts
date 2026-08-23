@@ -19,7 +19,7 @@ export interface SectionMeta {
 
 export const SECTIONS: SectionMeta[] = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/applications", label: "Applications", icon: Briefcase, phase: 5 },
+  { path: "/applications", label: "Applications", icon: Briefcase },
   { path: "/contacts", label: "Contacts", icon: Users },
   { path: "/emails", label: "Emails", icon: Mail, phase: 7 },
   { path: "/follow-ups", label: "Follow-ups", icon: BellRing, phase: 10 },

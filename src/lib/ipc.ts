@@ -235,6 +235,65 @@ export interface TagInput {
   color: string | null;
 }
 
+export type ApplicationStatus =
+  | "saved"
+  | "preparing"
+  | "applied"
+  | "contacted"
+  | "follow_up_due"
+  | "response_received"
+  | "oa"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "withdrawn";
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  "saved",
+  "preparing",
+  "applied",
+  "contacted",
+  "follow_up_due",
+  "response_received",
+  "oa",
+  "interview",
+  "offer",
+  "rejected",
+  "withdrawn",
+];
+
+export interface Application {
+  id: number;
+  company: string;
+  role: string;
+  jobDescription: string;
+  jobUrl: string | null;
+  source: string | null;
+  status: ApplicationStatus;
+  dateDiscovered: string | null;
+  dateApplied: string | null;
+  followUpDate: string | null;
+  interviewStatus: string | null;
+  priority: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApplicationInput {
+  company: string;
+  role: string;
+  jobDescription: string;
+  jobUrl: string | null;
+  source: string | null;
+  dateDiscovered: string | null;
+  dateApplied: string | null;
+  followUpDate: string | null;
+  interviewStatus: string | null;
+  priority: number;
+  notes: string;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -341,5 +400,16 @@ export const ipc = {
     list: () => invoke<Tag[]>("tag_list"),
     create: (input: TagInput) => invoke<Tag>("tag_create", { input }),
     remove: (id: number) => invoke<boolean>("tag_delete", { id }),
+  },
+
+  application: {
+    list: (status?: ApplicationStatus | null) =>
+      invoke<Application[]>("application_list", { status: status ?? undefined }),
+    create: (input: ApplicationInput) => invoke<Application>("application_create", { input }),
+    update: (id: number, input: ApplicationInput) =>
+      invoke<Application>("application_update", { id, input }),
+    setStatus: (id: number, status: ApplicationStatus) =>
+      invoke<Application>("application_set_status", { id, status }),
+    remove: (id: number) => invoke<boolean>("application_delete", { id }),
   },
 };
