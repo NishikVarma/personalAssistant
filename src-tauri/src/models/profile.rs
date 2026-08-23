@@ -35,6 +35,13 @@ macro_rules! str_enum {
             pub fn all() -> &'static [$name] {
                 &[$($name::$variant),+]
             }
+
+            pub fn try_from_str(value: &str) -> Option<$name> {
+                match value {
+                    $($value => Some($name::$variant),)+
+                    _ => None,
+                }
+            }
         }
     };
 }

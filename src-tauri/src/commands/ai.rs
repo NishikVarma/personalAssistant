@@ -19,7 +19,7 @@ async fn stored_model(pool: &sqlx::SqlitePool) -> AppResult<String> {
         .unwrap_or_else(|| DEFAULT_MODEL.to_string()))
 }
 
-async fn current_provider(state: &AppState) -> AppResult<GeminiProvider> {
+pub(crate) async fn current_provider(state: &AppState) -> AppResult<GeminiProvider> {
     let api_key = state
         .secrets
         .get(KEY_SERVICE, KEY_ACCOUNT)?

@@ -91,6 +91,14 @@ pub fn run() {
             commands::ai::ai_set_api_key,
             commands::ai::ai_clear_api_key,
             commands::ai::ai_test_connection,
+            commands::emails::generated_email_list,
+            commands::emails::generated_email_get,
+            commands::emails::generated_email_create,
+            commands::emails::generated_email_update,
+            commands::emails::generated_email_set_status,
+            commands::emails::generated_email_delete,
+            commands::emails::ai_generate_email,
+            commands::emails::ai_extract_contact,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

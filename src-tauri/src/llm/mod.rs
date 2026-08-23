@@ -1,3 +1,4 @@
+pub mod email_prompt;
 pub mod secrets;
 
 use std::time::Duration;

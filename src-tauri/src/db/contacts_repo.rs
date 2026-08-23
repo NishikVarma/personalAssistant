@@ -27,6 +27,16 @@ pub async fn get(pool: &SqlitePool, id: i64) -> AppResult<Contact> {
         .ok_or_else(|| AppError::NotFound(format!("contact {id}")))
 }
 
+/// Looks up a contact id by exact email (case-insensitive) without creating one.
+pub async fn find_id_by_email(pool: &SqlitePool, email: &str) -> AppResult<Option<i64>> {
+    let found: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM contacts WHERE email = ?1 COLLATE NOCASE")
+            .bind(email.trim())
+            .fetch_optional(pool)
+            .await?;
+    Ok(found.map(|(id,)| id))
+}
+
 fn validate(input: &ContactInput) -> AppResult<(String, String)> {
     let email = required(&input.email, "email")?;
     if !email.contains('@') {
