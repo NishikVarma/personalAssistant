@@ -1,3 +1,7 @@
+pub mod profile;
+
+pub use profile::*;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
