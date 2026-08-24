@@ -479,6 +479,89 @@ export interface LatexStatus {
   engine: string | null;
 }
 
+export interface ExtractedEducation {
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  startDate: string | null;
+  endDate: string | null;
+  grade: string | null;
+  location: string | null;
+  details: string;
+}
+
+export interface ExtractedExperience {
+  organization: string;
+  title: string;
+  employmentType: string | null;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  currentlyWorking: boolean;
+  description: string;
+}
+
+export interface ExtractedProject {
+  name: string;
+  description: string;
+  repoUrl: string | null;
+  liveUrl: string | null;
+  startedOn: string | null;
+  endedOn: string | null;
+}
+
+export interface ExtractedSkill {
+  name: string;
+  category: string | null;
+}
+
+export interface ExtractedCertification {
+  name: string;
+  issuer: string;
+  issueDate: string | null;
+  expiryDate: string | null;
+  credentialUrl: string | null;
+}
+
+export interface ExtractedAchievement {
+  title: string;
+  description: string;
+  date: string | null;
+}
+
+export interface ExtractedLink {
+  label: string;
+  url: string;
+  kind: string | null;
+}
+
+export interface ExtractedProfile {
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+  education: ExtractedEducation[];
+  experience: ExtractedExperience[];
+  projects: ExtractedProject[];
+  skills: ExtractedSkill[];
+  certifications: ExtractedCertification[];
+  achievements: ExtractedAchievement[];
+  links: ExtractedLink[];
+}
+
+export interface ImportCounts {
+  identityUpdated: boolean;
+  education: number;
+  experience: number;
+  projects: number;
+  skills: number;
+  certifications: number;
+  achievements: number;
+  links: number;
+  skippedDuplicates: number;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -678,6 +761,11 @@ export const ipc = {
       invoke<ResumeFile>("resume_file_upload", { kind, sourcePath }),
     remove: (id: number) => invoke<boolean>("resume_file_delete", { id }),
     texContent: (id: number) => invoke<string>("resume_file_tex_content", { id }),
+    extractProfile: (id: number) => invoke<ExtractedProfile>("resume_extract_profile", { id }),
+    extractFromText: (text: string) =>
+      invoke<ExtractedProfile>("resume_extract_from_text", { text }),
+    importExtracted: (profile: ExtractedProfile, markVerified: boolean) =>
+      invoke<ImportCounts>("profile_import_extracted", { profile, markVerified }),
   },
 
   latexDetect: () => invoke<LatexStatus>("latex_detect"),

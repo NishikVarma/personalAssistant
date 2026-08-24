@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, HardDriveDownload, ShieldCheck, Upload } from "lucide-react";
+import { FileText, HardDriveDownload, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ipc, type LatexStatus, type ResumeFile, type ResumeFileKind } from "@/lib/ipc";
+import { Textarea } from "@/components/ui/textarea";
+import ExtractionReview from "@/components/resumes/ExtractionReview";
+import {
+  ipc,
+  type ExtractedProfile,
+  type LatexStatus,
+  type ResumeFile,
+  type ResumeFileKind,
+  type ImportCounts,
+} from "@/lib/ipc";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,10 +35,12 @@ function FileList({
   files,
   onDelete,
   onView,
+  extraAction,
 }: {
   files: ResumeFile[];
   onDelete: (id: number) => Promise<void>;
   onView?: (file: ResumeFile) => void;
+  extraAction?: (file: ResumeFile) => React.ReactNode;
 }) {
   if (files.length === 0) {
     return (
@@ -49,6 +61,7 @@ function FileList({
               {new Date(file.createdAt).toLocaleDateString()} · sha256 {file.sha256.slice(0, 12)}…
             </p>
           </div>
+          {extraAction ? extraAction(file) : null}
           {onView ? (
             <Button variant="ghost" size="xs" onClick={() => onView(file)}>
               View source
@@ -79,6 +92,10 @@ export default function Resumes() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<{ file: ResumeFile; content: string } | null>(null);
+  const [extractingId, setExtractingId] = useState<number | null>(null);
+  const [review, setReview] = useState<ExtractedProfile | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   const reload = () => {
     Promise.all([
@@ -114,6 +131,40 @@ export default function Resumes() {
       toast.error(String(e));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const extractProfile = async (file: ResumeFile) => {
+    setExtractingId(file.id);
+    try {
+      const extracted = await ipc.resumeFile.extractProfile(file.id);
+      setReview(extracted);
+    } catch (e) {
+      const message = String(e);
+      if (message.toLowerCase().includes("no readable text layer")) {
+        toast.message("No text layer in this PDF", {
+          description: "Paste the resume text instead and the AI will structure it.",
+        });
+        setPasteOpen(true);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setExtractingId(null);
+    }
+  };
+
+  const extractFromPaste = async () => {
+    setExtractingId(-1);
+    try {
+      const extracted = await ipc.resumeFile.extractFromText(pasteText);
+      setPasteOpen(false);
+      setPasteText("");
+      setReview(extracted);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setExtractingId(null);
     }
   };
 
@@ -153,8 +204,27 @@ export default function Resumes() {
         >
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : pdfs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing uploaded yet — upload a master resume, then extract its contents into your
+              career profile.
+            </p>
           ) : (
-            <FileList files={pdfs} onDelete={remove} />
+            <FileList
+              files={pdfs}
+              onDelete={remove}
+              onView={undefined}
+              extraAction={(file) => (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={extractingId !== null}
+                  onClick={() => void extractProfile(file)}
+                >
+                  <Sparkles /> {extractingId === file.id ? "Extracting…" : "Extract profile"}
+                </Button>
+              )}
+            />
           )}
         </SectionCard>
 
@@ -200,6 +270,53 @@ export default function Resumes() {
           </ul>
         </SectionCard>
       </div>
+
+      {pasteOpen ? (
+        <Dialog open onOpenChange={(o) => !o && setPasteOpen(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Paste resume text</DialogTitle>
+              <DialogDescription>
+                This PDF has no readable text layer. Paste the resume content and the AI will
+                structure it.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              rows={10}
+              value={pasteText}
+              placeholder="Paste the full resume text here…"
+              onChange={(e) => setPasteText(e.target.value)}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPasteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={extractingId === -1 || pasteText.trim().length < 40}
+                onClick={() => void extractFromPaste()}
+              >
+                {extractingId === -1 ? "Structuring…" : "Structure with AI"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {review ? (
+        <ExtractionReview
+          profile={review}
+          onClose={() => setReview(null)}
+          onImported={(counts: ImportCounts) => {
+            const total =
+              counts.education + counts.experience + counts.projects + counts.skills +
+              counts.certifications + counts.achievements + counts.links +
+              (counts.identityUpdated ? 1 : 0);
+            toast.success(
+              `Imported ${total} item${total === 1 ? "" : "s"} into your career profile (verified)`,
+            );
+          }}
+        />
+      ) : null}
 
       {viewing ? (
         <Dialog open onOpenChange={(o) => !o && setViewing(null)}>
