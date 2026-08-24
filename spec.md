@@ -102,9 +102,11 @@ the OS keyring; Gmail passwords are never stored).
 - applications (5): application_list(status filter)/create/update/set_status/delete
 - ai (7): ai_get_config / set_model / set_api_key / clear_api_key / test_connection /
   generate_email / extract_contact
-- emails (7): generated_email_list(status filter)/get/create/update/set_status/delete/send
-- gmail (6): google_set_client_secret / has_client_secret / begin_connect /
-  complete_connect / status / disconnect
+- emails (12): generated_email_list/get/create/update/set_status/delete/send/
+  save_as_template; email_history_list(filter)/set_response/record_incoming;
+  email_template_list/create/update/delete
+- gmail (7): google_set_client_secret / has_client_secret / begin_connect /
+  complete_connect / status / disconnect / sync_replies
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -148,6 +150,23 @@ contacts are auto-linked by exact email match.
 - Migration `0002_email_recipients.sql` adds recipient columns to `generated_emails` and
   `email_history`.
 
+## Email History, Templates & Reply Sync (implemented)
+
+- Every send is recorded in `email_history` (direction, Gmail ids, recipient, response
+  status `awaiting`); the linked contact's last-contacted time is stamped transactionally.
+- The Emails page has a **History** card: filter by application or contact, per-row
+  response status dropdown (awaiting / replied / no reply needed), manual **Log received**
+  dialog, and **Sync replies**.
+- **Reply sync** (`gmail_sync_replies`) polls the Gmail threads of up to 50 `awaiting`
+  sends: a message from a different sender newer than our send is recorded as an incoming
+  history row (snippet as body preview) and the sent row flips to `replied`. Detection is
+  deterministic application code; the AI is never involved.
+- **Template memory**: `email_templates` stores reusable emails (user-created or saved
+  from drafts). `ai_generate_email` picks the best match for the draft's type — company
+  match > role match > usage count — passes it into the prompt as an adaptation reference
+  and bumps its usage counters. The UI offers a Templates library card and a
+  "Save as template" action on approved/sent drafts.
+
 ## Implemented Capabilities (as of this spec)
 
 Development plan from the original project brief — 17 incremental steps:
@@ -162,7 +181,8 @@ Development plan from the original project brief — 17 incremental steps:
 | 6  | Gemini integration (LLMProvider implementation) | Done   |
 | 7  | Single-email generation                         | Done   |
 | 8  | Gmail OAuth and sending                         | Done   |
-| 9  | Email history                                   | Next   |
+| 9  | Email history                                   | Done   |
+| 10 | Follow-up scheduling/notifications              | Next   |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
 | 12 | Career profile extraction/verification          | –      |
