@@ -109,6 +109,9 @@ the OS keyring; Gmail passwords are never stored).
   complete_connect / status / disconnect / sync_replies
 - follow_ups (9): follow_up_list / due / due_count / sweep / reschedule / cancel /
   config_get / config_set / draft
+- resumes (8): resume_file_upload (content-addressed, dedup) / list / delete /
+  tex_content / latex_detect / extract_profile / extract_from_text /
+  profile_import_extracted
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -151,6 +154,18 @@ contacts are auto-linked by exact email match.
   confirmation dialog.
 - Migration `0002_email_recipients.sql` adds recipient columns to `generated_emails` and
   `email_history`.
+
+## Resume Import & Extraction (implemented)
+
+- Master resume PDFs and Jake's-style .tex templates upload into an immutable,
+  content-addressed store (`app_data_dir/resumes/`, sha256 dedup). Originals are never
+  modified; deleting removes only the stored copy.
+- LaTeX engine detection (pdflatex/xelatex/tectonic) gates later PDF compilation with a
+  clear ".tex export only" fallback.
+- `resume_extract_profile` pulls the PDF text layer (scanned PDFs are rejected with a
+  paste-fallback path), sends it to Gemini with strict facts-only rules, and returns a
+  structured `ExtractedProfile`. The review UI lets you edit, untick and import; approved
+  items are created through the standard profile repos **marked verified**.
 
 ## Follow-up System (implemented)
 
@@ -195,7 +210,10 @@ Development plan from the original project brief — 17 incremental steps:
 | 8  | Gmail OAuth and sending                         | Done   |
 | 9  | Email history                                   | Done   |
 | 10 | Follow-up scheduling/notifications              | Done   |
-| 11 | Resume PDF import                               | Next   |
+| 11 | Resume PDF import                               | Done   |
+| 12 | Career profile extraction/verification          | Done   |
+| 13 | LaTeX template import                           | Done   |
+| 14 | Resume generation                               | Next   |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
 | 12 | Career profile extraction/verification          | –      |
