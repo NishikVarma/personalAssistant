@@ -460,6 +460,25 @@ export interface FollowUpConfig {
   autoSchedule: boolean;
 }
 
+export type ResumeFileKind = "pdf_master" | "tex_template";
+
+export interface ResumeFile {
+  id: number;
+  kind: ResumeFileKind;
+  originalFilename: string;
+  storedPath: string;
+  sha256: string;
+  fileSize: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LatexStatus {
+  available: boolean;
+  engine: string | null;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -651,4 +670,15 @@ export const ipc = {
       }),
     draft: (id: number) => invoke<GeneratedEmail>("follow_up_draft", { id }),
   },
+
+  resumeFile: {
+    list: (kind?: ResumeFileKind | null) =>
+      invoke<ResumeFile[]>("resume_file_list", { kind: kind ?? undefined }),
+    upload: (kind: ResumeFileKind, sourcePath: string) =>
+      invoke<ResumeFile>("resume_file_upload", { kind, sourcePath }),
+    remove: (id: number) => invoke<boolean>("resume_file_delete", { id }),
+    texContent: (id: number) => invoke<string>("resume_file_tex_content", { id }),
+  },
+
+  latexDetect: () => invoke<LatexStatus>("latex_detect"),
 };

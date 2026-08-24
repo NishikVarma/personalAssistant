@@ -23,7 +23,7 @@ export const SECTIONS: SectionMeta[] = [
   { path: "/contacts", label: "Contacts", icon: Users },
   { path: "/emails", label: "Emails", icon: Mail },
   { path: "/follow-ups", label: "Follow-ups", icon: BellRing },
-  { path: "/resumes", label: "Resumes", icon: FileText, phase: 11 },
+  { path: "/resumes", label: "Resumes", icon: FileText },
   { path: "/career-profile", label: "Career Profile", icon: UserRound },
   { path: "/settings", label: "Settings", icon: SettingsIcon },
 ];
