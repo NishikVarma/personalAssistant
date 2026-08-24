@@ -13,12 +13,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type Link, type LinkInput, type LinkKind } from "@/lib/ipc";
 
 const FIELDS = [
-  { name: "label", label: "Label", type: "text" as const, required: true },
   {
     name: "kind",
     label: "Kind",
     type: "select" as const,
     options: LINK_KIND_OPTIONS,
+  },
+  {
+    name: "label",
+    label: "Label",
+    type: "text" as const,
+    required: true,
+    dynamicPlaceholder: (values: FormValues) =>
+      values.kind === "other"
+        ? "Custom name — e.g. Blog, Dribbble, Kaggle…"
+        : undefined,
   },
   { name: "url", label: "URL", type: "text" as const, required: true, full: true, placeholder: "https://…" },
 ];

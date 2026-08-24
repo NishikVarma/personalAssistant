@@ -26,6 +26,8 @@ export interface FieldDef {
   required?: boolean;
   placeholder?: string;
   full?: boolean;
+  /** Overrides the placeholder based on current form values (e.g. custom link kinds). */
+  dynamicPlaceholder?: (values: FormValues) => string | undefined;
 }
 
 export type FormValues = Record<string, string>;
@@ -67,6 +69,31 @@ export default function FormDialog({
   const setValue = (name: string, value: string) =>
     setValues((prev) => ({ ...prev, [name]: value }));
 
+  const advanceFocus = (current: HTMLElement | null) => {
+    const form = current?.closest("form");
+    if (!form || !current) return;
+    const focusables = Array.from(
+      form.querySelectorAll<HTMLElement>("input, select, textarea"),
+    ).filter((el) => !el.hasAttribute("disabled"));
+    const next = focusables[focusables.indexOf(current) + 1];
+    if (next) next.focus();
+  };
+
+  const handleDateKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      advanceFocus(e.currentTarget);
+    }
+  };
+
+  const handleDateChange = (field: FieldDef, e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(field.name, e.target.value);
+    // a complete date means the picker was used — move on instead of trapping focus
+    if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+      advanceFocus(e.currentTarget);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     for (const field of fields) {
@@ -103,7 +130,13 @@ export default function FormDialog({
               >
                 <Label htmlFor={`field-${field.name}`} className="mb-1.5">
                   {field.label}
-                  {field.required ? <span className="text-destructive">*</span> : null}
+                  {field.required ? (
+                    <span className="text-destructive">*</span>
+                  ) : field.type === "date" ? (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  ) : null}
                 </Label>
                 {field.type === "textarea" ? (
                   <Textarea
@@ -129,8 +162,15 @@ export default function FormDialog({
                     id={`field-${field.name}`}
                     type={field.type === "date" ? "date" : "text"}
                     value={values[field.name]}
-                    placeholder={field.placeholder}
-                    onChange={(e) => setValue(field.name, e.target.value)}
+                    placeholder={
+                      field.dynamicPlaceholder?.(values) ?? field.placeholder
+                    }
+                    onChange={(e) =>
+                      field.type === "date"
+                        ? handleDateChange(field, e)
+                        : setValue(field.name, e.target.value)
+                    }
+                    onKeyDown={field.type === "date" ? handleDateKeyDown : undefined}
                   />
                 )}
               </div>
