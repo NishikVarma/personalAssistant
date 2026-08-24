@@ -5,7 +5,8 @@ use tauri::State;
 
 use crate::db::resume_files_repo;
 use crate::error::{AppError, AppResult};
-use crate::models::resume::{LatexStatus, ResumeFile, ResumeFileKind};
+use crate::llm::{extract_prompt, LlmProvider};
+use crate::models::resume::{ExtractedProfile, LatexStatus, ResumeFile, ResumeFileKind};
 use crate::state::AppState;
 
 fn expected_extension(kind: ResumeFileKind) -> &'static str {
@@ -138,4 +139,293 @@ pub async fn latex_detect() -> LatexStatus {
         }
     }
     LatexStatus { available: false, engine: None }
+}
+
+// ---------- AI extraction ----------
+
+pub fn pdf_text(path: &str) -> AppResult<String> {
+    pdf_extract::extract_text(path)
+        .map_err(|e| AppError::InvalidInput(format!("could not read PDF text: {e}")))
+}
+
+pub fn require_text_layer(text: &str) -> AppResult<String> {
+    let trimmed = text.trim();
+    if trimmed.len() < 40 {
+        return Err(AppError::InvalidInput(
+            "this PDF has no readable text layer (likely a scan). Use the paste option instead."
+                .to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+/// Extracts structured profile data from a stored master resume via Gemini.
+/// Read-only: nothing touches the career profile until you approve an import.
+#[tauri::command]
+pub async fn resume_extract_profile(
+    state: State<'_, AppState>,
+    id: i64,
+) -> AppResult<ExtractedProfile> {
+    let file = resume_files_repo::get(&state.pool, id).await?;
+    if file.kind != ResumeFileKind::PdfMaster.as_str() {
+        return Err(AppError::InvalidInput(
+            "only master resume PDFs can be extracted".to_string(),
+        ));
+    }
+    let text = require_text_layer(&pdf_text(&file.stored_path)?)?;
+    extract_from_text_inner(&state, &text).await
+}
+
+/// Same structuring for manually pasted resume text (scanned-PDF fallback).
+#[tauri::command]
+pub async fn resume_extract_from_text(
+    state: State<'_, AppState>,
+    text: String,
+) -> AppResult<ExtractedProfile> {
+    let text = require_text_layer(&text)?;
+    extract_from_text_inner(&state, &text).await
+}
+
+async fn extract_from_text_inner(
+    state: &AppState,
+    text: &str,
+) -> AppResult<ExtractedProfile> {
+    let provider = super::ai::current_provider(state).await?;
+    let prompt = extract_prompt::build_extraction_prompt(text);
+    let raw = provider.complete(prompt).await?;
+    extract_prompt::parse_extracted_profile(&raw)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCounts {
+    pub identity_updated: bool,
+    pub education: u64,
+    pub experience: u64,
+    pub projects: u64,
+    pub skills: u64,
+    pub certifications: u64,
+    pub achievements: u64,
+    pub links: u64,
+    pub skipped_duplicates: u64,
+}
+
+fn non_empty(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
+/// Imports reviewed extraction data into the career profile. Rows are created
+/// through the standard repos and marked verified (the user approved them in
+/// the review UI).
+#[tauri::command]
+pub async fn profile_import_extracted(
+    state: State<'_, AppState>,
+    profile: ExtractedProfile,
+    mark_verified: bool,
+) -> AppResult<ImportCounts> {
+    profile_import_extracted_inner(&state.pool, &profile, mark_verified).await
+}
+
+pub async fn profile_import_extracted_inner(
+    pool: &sqlx::SqlitePool,
+    profile: &ExtractedProfile,
+    mark_verified: bool,
+) -> AppResult<ImportCounts> {
+    let mut counts = ImportCounts {
+        identity_updated: false,
+        education: 0,
+        experience: 0,
+        projects: 0,
+        skills: 0,
+        certifications: 0,
+        achievements: 0,
+        links: 0,
+        skipped_duplicates: 0,
+    };
+
+    // identity: merge non-empty extracted fields over the existing profile
+    if non_empty(&profile.full_name).is_some()
+        || non_empty(&profile.email).is_some()
+        || non_empty(&profile.phone).is_some()
+        || non_empty(&profile.location).is_some()
+        || non_empty(&profile.summary).is_some()
+    {
+        let current = crate::db::profile_repo::get(pool).await?;
+        let merged = crate::models::profile::UserProfileInput {
+            full_name: non_empty(&profile.full_name).unwrap_or(current.full_name),
+            email: non_empty(&profile.email).unwrap_or(current.email),
+            phone: non_empty(&profile.phone).unwrap_or(current.phone),
+            location: non_empty(&profile.location).unwrap_or(current.location),
+            summary: non_empty(&profile.summary).unwrap_or(current.summary),
+        };
+        crate::db::profile_repo::update(pool, &merged).await?;
+        counts.identity_updated = true;
+    }
+
+    for education in &profile.education {
+        if education.institution.trim().is_empty() {
+            continue;
+        }
+        let created = crate::db::education_repo::create(
+            pool,
+            &crate::models::profile::EducationInput {
+                institution: education.institution.clone(),
+                degree: education.degree.clone(),
+                field_of_study: education.field_of_study.clone(),
+                start_date: education.start_date.clone(),
+                end_date: education.end_date.clone(),
+                grade: education.grade.clone(),
+                location: education.location.clone(),
+                details: education.details.clone(),
+            },
+        )
+        .await?;
+        if mark_verified {
+            crate::db::education_repo::set_verified(pool, created.id, true).await?;
+        }
+        counts.education += 1;
+    }
+
+    for experience in &profile.experience {
+        if experience.organization.trim().is_empty() || experience.title.trim().is_empty() {
+            continue;
+        }
+        let employment_type = experience
+            .employment_type
+            .as_deref()
+            .and_then(crate::models::profile::EmploymentType::try_from_str)
+            .unwrap_or(crate::models::profile::EmploymentType::FullTime);
+        let created = crate::db::experience_repo::create(
+            pool,
+            &crate::models::profile::ExperienceInput {
+                organization: experience.organization.clone(),
+                title: experience.title.clone(),
+                employment_type,
+                location: experience.location.clone(),
+                start_date: experience.start_date.clone(),
+                end_date: experience.end_date.clone(),
+                currently_working: experience.currently_working,
+                description: experience.description.clone(),
+            },
+        )
+        .await?;
+        if mark_verified {
+            crate::db::experience_repo::set_verified(pool, created.id, true).await?;
+        }
+        counts.experience += 1;
+    }
+
+    for project in &profile.projects {
+        if project.name.trim().is_empty() {
+            continue;
+        }
+        let created = crate::db::projects_repo::create(
+            pool,
+            &crate::models::profile::ProjectInput {
+                name: project.name.clone(),
+                description: project.description.clone(),
+                repo_url: project.repo_url.clone(),
+                live_url: project.live_url.clone(),
+                status: crate::models::profile::ProjectStatus::Completed,
+                started_on: project.started_on.clone(),
+                ended_on: project.ended_on.clone(),
+            },
+        )
+        .await?;
+        if mark_verified {
+            crate::db::projects_repo::set_verified(pool, created.id, true).await?;
+        }
+        counts.projects += 1;
+    }
+
+    for skill in &profile.skills {
+        if skill.name.trim().is_empty() {
+            continue;
+        }
+        let category = skill
+            .category
+            .as_deref()
+            .and_then(crate::models::profile::SkillCategory::try_from_str)
+            .unwrap_or(crate::models::profile::SkillCategory::Other);
+        match crate::db::skills_repo::create(
+            pool,
+            &crate::models::profile::SkillInput { name: skill.name.clone(), category },
+        )
+        .await
+        {
+            Ok(created) => {
+                counts.skills += 1;
+                if mark_verified {
+                    // skills have no verified column; linking is the source of truth
+                    let _ = created;
+                }
+            }
+            Err(AppError::InvalidInput(_)) => counts.skipped_duplicates += 1,
+            Err(e) => return Err(e),
+        }
+    }
+
+    for certification in &profile.certifications {
+        if certification.name.trim().is_empty() {
+            continue;
+        }
+        let created = crate::db::certifications_repo::create(
+            pool,
+            &crate::models::profile::CertificationInput {
+                name: certification.name.clone(),
+                issuer: certification.issuer.clone(),
+                issue_date: certification.issue_date.clone(),
+                expiry_date: certification.expiry_date.clone(),
+                credential_url: certification.credential_url.clone(),
+            },
+        )
+        .await?;
+        if mark_verified {
+            crate::db::certifications_repo::set_verified(pool, created.id, true).await?;
+        }
+        counts.certifications += 1;
+    }
+
+    for achievement in &profile.achievements {
+        if achievement.title.trim().is_empty() {
+            continue;
+        }
+        let created = crate::db::achievements_repo::create(
+            pool,
+            &crate::models::profile::AchievementInput {
+                title: achievement.title.clone(),
+                description: achievement.description.clone(),
+                date: achievement.date.clone(),
+            },
+        )
+        .await?;
+        if mark_verified {
+            crate::db::achievements_repo::set_verified(pool, created.id, true).await?;
+        }
+        counts.achievements += 1;
+    }
+
+    for link in &profile.links {
+        if link.url.trim().is_empty() {
+            continue;
+        }
+        let kind = link
+            .kind
+            .as_deref()
+            .and_then(crate::models::profile::LinkKind::try_from_str)
+            .unwrap_or(crate::models::profile::LinkKind::Other);
+        crate::db::links_repo::create(
+            pool,
+            &crate::models::profile::LinkInput {
+                label: link.label.clone(),
+                url: link.url.clone(),
+                kind,
+            },
+        )
+        .await?;
+        counts.links += 1;
+    }
+
+    Ok(counts)
 }

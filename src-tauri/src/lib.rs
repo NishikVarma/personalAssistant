@@ -137,6 +137,9 @@ pub fn run() {
             commands::resumes::resume_file_delete,
             commands::resumes::resume_file_tex_content,
             commands::resumes::latex_detect,
+            commands::resumes::resume_extract_profile,
+            commands::resumes::resume_extract_from_text,
+            commands::resumes::profile_import_extracted,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
