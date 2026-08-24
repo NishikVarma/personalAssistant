@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Check, ClipboardCopy, Mail, Paperclip, Pencil, Send, Sparkles, Wand2 } from "lucide-react";
+import { Check, ClipboardCopy, FileOutput, Mail, Paperclip, Pencil, Send, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-dialog";
+import HistoryCard from "@/components/emails/HistoryCard";
+import TemplatesCard from "@/components/emails/TemplatesCard";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EmptyState from "@/components/EmptyState";
 import SectionCard from "@/components/profile/SectionCard";
@@ -25,6 +27,7 @@ import {
   EMAIL_TYPES,
   ipc,
   type Application,
+  type Contact,
   type EmailStatus,
   type EmailType,
   type GeneratedEmail,
@@ -78,6 +81,7 @@ const EMPTY_COMPOSE: ComposeState = {
 export default function Emails() {
   const [compose, setCompose] = useState<ComposeState>(EMPTY_COMPOSE);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [emails, setEmails] = useState<GeneratedEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<GeneratedEmail | null>(null);
@@ -109,6 +113,10 @@ export default function Emails() {
       .list()
       .then(setApplications)
       .catch(() => setApplications([]));
+    ipc.contact
+      .list()
+      .then((rows) => setContacts(Array.isArray(rows) ? rows : []))
+      .catch(() => setContacts([]));
     ipc.gmail
       .status()
       .then(setGmailStatus)
@@ -525,6 +533,23 @@ export default function Emails() {
                     />
                   </>
                 )}
+                {selected.status === "approved" || selected.status === "sent" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      try {
+                        await ipc.generatedEmail.saveAsTemplate(selected.id);
+                        toast.success("Saved as a reusable template");
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
+                    }}
+                  >
+                    <FileOutput /> Save as template
+                  </Button>
+                ) : null}
                 {dirty ? (
                   <span className="text-xs text-muted-foreground">Unsaved edits</span>
                 ) : null}
@@ -594,7 +619,10 @@ export default function Emails() {
           </DialogContent>
         </Dialog>
 
-        <SectionCard title={`History${emails.length ? ` (${emails.length})` : ""}`}>
+        <HistoryCard applications={applications} contacts={contacts} gmailConnected={Boolean(gmailStatus?.connected)} />
+        <TemplatesCard />
+
+        <SectionCard title={`Draft history${emails.length ? ` (${emails.length})` : ""}`}>
           {loading ? (
             <div className="space-y-2">
               <Skeleton className="h-8 w-full" />

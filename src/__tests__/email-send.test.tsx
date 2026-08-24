@@ -42,6 +42,10 @@ beforeEach(() => {
         return Promise.resolve([APPROVED]);
       case "application_list":
         return Promise.resolve([]);
+      case "email_history_list":
+        return Promise.resolve([]);
+      case "email_template_list":
+        return Promise.resolve([]);
       case "google_status":
         return Promise.resolve({ connected: true, accountEmail: "me@gmail.com" });
       case "email_send":
@@ -113,6 +117,10 @@ describe("Emails send flow", () => {
         case "generated_email_list":
           return Promise.resolve([APPROVED]);
         case "application_list":
+          return Promise.resolve([]);
+        case "email_history_list":
+          return Promise.resolve([]);
+        case "email_template_list":
           return Promise.resolve([]);
         case "google_status":
           return Promise.resolve({ connected: true, accountEmail: "me@gmail.com" });

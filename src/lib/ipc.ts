@@ -325,6 +325,67 @@ export const EMAIL_TYPES: EmailType[] = [
 
 export type EmailStatus = "draft" | "edited" | "approved" | "sent" | "discarded";
 
+export type ResponseStatus = "awaiting" | "replied" | "no_reply_needed";
+
+export interface EmailHistory {
+  id: number;
+  direction: "outgoing" | "incoming";
+  applicationId: number | null;
+  contactId: number | null;
+  generatedEmailId: number | null;
+  gmailMessageId: string | null;
+  gmailThreadId: string | null;
+  emailType: EmailType | null;
+  recipientEmail: string | null;
+  subject: string | null;
+  body: string;
+  deliveryMethod: string | null;
+  status: string;
+  responseStatus: ResponseStatus | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export interface HistoryFilter {
+  contactId: number | null;
+  applicationId: number | null;
+  limit: number | null;
+}
+
+export interface IncomingEmailInput {
+  contactId: number | null;
+  applicationId: number | null;
+  senderEmail: string;
+  emailType: EmailType | null;
+  subject: string | null;
+  body: string;
+  occurredAt: string | null;
+}
+
+export interface EmailTemplate {
+  id: number;
+  emailType: EmailType;
+  role: string | null;
+  companyOrIndustry: string | null;
+  subjectTemplate: string | null;
+  bodyTemplate: string;
+  variablesJson: string;
+  source: "user" | "generated" | "imported";
+  successCount: number;
+  timesUsed: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateInput {
+  emailType: EmailType;
+  role: string | null;
+  companyOrIndustry: string | null;
+  subjectTemplate: string | null;
+  bodyTemplate: string;
+}
+
 export interface GeneratedEmail {
   id: number;
   applicationId: number | null;
@@ -520,6 +581,24 @@ export const ipc = {
     remove: (id: number) => invoke<boolean>("generated_email_delete", { id }),
     send: (id: number, attachmentPath: string | null, force: boolean) =>
       invoke<GeneratedEmail>("email_send", { id, attachmentPath, force }),
+    saveAsTemplate: (id: number) => invoke<EmailTemplate>("email_template_save_from_email", { id }),
+  },
+
+  emailHistory: {
+    list: (filter: HistoryFilter) => invoke<EmailHistory[]>("email_history_list", { filter }),
+    setResponse: (id: number, status: ResponseStatus | null) =>
+      invoke<EmailHistory>("email_history_set_response", { id, status }),
+    recordIncoming: (input: IncomingEmailInput) =>
+      invoke<EmailHistory>("email_history_record_incoming", { input }),
+  },
+
+  emailTemplate: {
+    list: (emailType?: EmailType | null) =>
+      invoke<EmailTemplate[]>("email_template_list", { emailType: emailType ?? undefined }),
+    create: (input: EmailTemplateInput) => invoke<EmailTemplate>("email_template_create", { input }),
+    update: (id: number, input: EmailTemplateInput) =>
+      invoke<EmailTemplate>("email_template_update", { id, input }),
+    remove: (id: number) => invoke<boolean>("email_template_delete", { id }),
   },
 
   gmail: {
@@ -529,5 +608,6 @@ export const ipc = {
     beginConnect: () => invoke<ConnectStart>("google_begin_connect"),
     completeConnect: () => invoke<GmailStatus>("google_complete_connect"),
     disconnect: () => invoke<boolean>("google_disconnect"),
+    syncReplies: () => invoke<{ checked: number; repliesFound: number }>("gmail_sync_replies"),
   },
 };

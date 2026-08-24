@@ -39,6 +39,10 @@ beforeEach(() => {
         return Promise.resolve([EXISTING]);
       case "application_list":
         return Promise.resolve([]);
+      case "email_history_list":
+        return Promise.resolve([]);
+      case "email_template_list":
+        return Promise.resolve([]);
       case "ai_generate_email":
         return Promise.resolve(GENERATED);
       case "generated_email_get":
