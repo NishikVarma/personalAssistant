@@ -46,7 +46,7 @@ function toInput(values: FormValues): EmailTemplateInput {
     role: emptyToNull(values.role),
     companyOrIndustry: emptyToNull(values.companyOrIndustry),
     subjectTemplate: emptyToNull(values.subjectTemplate),
-    bodyTemplate: values.body,
+    bodyTemplate: values.bodyTemplate,
   };
 }
 
@@ -139,7 +139,9 @@ export default function TemplatesCard() {
         <FormDialog
           title={dialog.mode === "add" ? "Add template" : "Edit template"}
           fields={FIELDS}
-          initial={dialog.mode === "edit" ? toInitial(dialog.item) : {}}
+          initial={
+            dialog.mode === "edit" ? toInitial(dialog.item) : { emailType: "cold_outreach" }
+          }
           onSubmit={async (values) => {
             if (dialog.mode === "add") {
               await ipc.emailTemplate.create(toInput(values));

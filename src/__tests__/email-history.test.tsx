@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -118,5 +118,37 @@ describe("TemplatesCard", () => {
     expect(await screen.findByText(/hi acme/i)).toBeTruthy();
     expect(screen.getByText(/used 3×/i)).toBeTruthy();
     expect(screen.getByText(/backend at acme/i)).toBeTruthy();
+  });
+
+  it("submits the body text as bodyTemplate when creating", async () => {
+    invokeMock.mockImplementation((command: string) =>
+      command === "email_template_list"
+        ? Promise.resolve([])
+        : command === "email_template_create"
+          ? Promise.resolve(TEMPLATE)
+          : Promise.resolve(null),
+    );
+    const user = userEvent.setup();
+    render(<TemplatesCard />);
+
+    await user.click(await screen.findByRole("button", { name: /^add$/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    await user.selectOptions(within(dialog).getByLabelText(/email type/i), "cold_outreach");
+    // body field is named bodyTemplate; regression guard for the dropped-field bug
+    const bodyBox = within(dialog).getByLabelText(/body/i);
+    await user.type(bodyBox, "Hello from the template body");
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith(
+        "email_template_create",
+        expect.objectContaining({
+          input: expect.objectContaining({
+            bodyTemplate: "Hello from the template body",
+          }),
+        }),
+      );
+    });
   });
 });
