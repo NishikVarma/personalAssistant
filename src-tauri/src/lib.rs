@@ -1,11 +1,13 @@
 mod commands;
 pub mod db;
 pub mod error;
+pub mod gmail;
 pub mod llm;
 pub mod models;
 mod state;
 use tauri::Manager;
 
+use crate::gmail::OauthCoordinator;
 use crate::llm::secrets::KeyringStore;
 use crate::state::AppState;
 
@@ -13,6 +15,7 @@ use crate::state::AppState;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let (pool, db_path) = tauri::async_runtime::block_on(db::init(data_dir))?;
@@ -20,6 +23,7 @@ pub fn run() {
                 pool,
                 db_path,
                 secrets: std::sync::Arc::new(KeyringStore::new()),
+                oauth: std::sync::Arc::new(OauthCoordinator::new()),
             });
             Ok(())
         })
@@ -99,6 +103,13 @@ pub fn run() {
             commands::emails::generated_email_delete,
             commands::emails::ai_generate_email,
             commands::emails::ai_extract_contact,
+            commands::emails::email_send,
+            commands::gmail::google_set_client_secret,
+            commands::gmail::google_has_client_secret,
+            commands::gmail::google_begin_connect,
+            commands::gmail::google_complete_connect,
+            commands::gmail::google_status,
+            commands::gmail::google_disconnect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

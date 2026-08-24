@@ -21,6 +21,7 @@ dist-ssr
 
 # Local reference material (never commit)
 justForPrompt/
+.opencode/
 *.ntvs*
 *.njsproj
 *.sln

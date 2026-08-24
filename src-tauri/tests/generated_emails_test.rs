@@ -18,6 +18,8 @@ fn draft_input() -> GeneratedEmailInput {
         application_id: None,
         contact_id: None,
         email_type: EmailType::ColdOutreach,
+        recipient_email: Some("jane@acme.com".to_string()),
+        recipient_name: None,
         subject: Some("Exploring backend roles".to_string()),
         body: "Hi Jane, I am a backend engineer...".to_string(),
     }

@@ -14,6 +14,8 @@ pub enum AppError {
     NotFound(String),
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    #[error("recent outreach: {0}")]
+    RecentOutreach(String),
     #[error("secret store error: {0}")]
     Secret(String),
     #[error("not implemented: {0}")]

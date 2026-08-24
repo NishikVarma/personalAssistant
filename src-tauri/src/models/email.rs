@@ -47,6 +47,8 @@ pub struct GeneratedEmail {
     pub application_id: Option<i64>,
     pub contact_id: Option<i64>,
     pub email_type: String,
+    pub recipient_email: Option<String>,
+    pub recipient_name: Option<String>,
     pub subject: Option<String>,
     pub body: String,
     pub provider: Option<String>,
@@ -62,6 +64,8 @@ pub struct GeneratedEmailInput {
     pub application_id: Option<i64>,
     pub contact_id: Option<i64>,
     pub email_type: EmailType,
+    pub recipient_email: Option<String>,
+    pub recipient_name: Option<String>,
     pub subject: Option<String>,
     pub body: String,
 }

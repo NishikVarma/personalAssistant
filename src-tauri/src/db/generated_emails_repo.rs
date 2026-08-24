@@ -65,12 +65,15 @@ pub async fn create(pool: &SqlitePool, input: &GeneratedEmailInput) -> AppResult
     let body = validate_content(input)?;
     let result = sqlx::query(
         "INSERT INTO generated_emails
-             (application_id, contact_id, email_type, subject, body, status, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'draft', ?6, ?6)",
+             (application_id, contact_id, email_type, recipient_email, recipient_name,
+              subject, body, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'draft', ?8, ?8)",
     )
     .bind(input.application_id)
     .bind(input.contact_id)
     .bind(input.email_type.as_str())
+    .bind(optional(&input.recipient_email))
+    .bind(optional(&input.recipient_name))
     .bind(optional(&input.subject))
     .bind(&body)
     .bind(now())
