@@ -18,6 +18,9 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
+
+# Local reference material (never commit)
+justForPrompt/
 *.ntvs*
 *.njsproj
 *.sln
