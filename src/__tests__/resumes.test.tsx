@@ -42,7 +42,7 @@ beforeEach(() => {
   invokeMock.mockImplementation((command: string) => {
     switch (command) {
       case "resume_file_list":
-        return Promise.resolve([PDF]);
+        return Promise.resolve(args?.kind === "pdf_master" ? [PDF] : []);
       case "latex_detect":
         return Promise.resolve({ available: true, engine: "pdflatex" });
       default:
