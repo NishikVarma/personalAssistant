@@ -33,7 +33,7 @@ async fn migrations_apply_and_settings_roundtrip() {
 async fn schema_version_matches_migration_count() {
     let (pool, _dir) = test_pool().await;
     let version = db::schema_version(&pool).await.unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
 }
 
 #[tokio::test]

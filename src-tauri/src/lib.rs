@@ -16,6 +16,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let (pool, db_path) = tauri::async_runtime::block_on(db::init(data_dir))?;
@@ -119,6 +120,15 @@ pub fn run() {
             commands::gmail::google_status,
             commands::gmail::google_disconnect,
             commands::gmail::gmail_sync_replies,
+            commands::follow_up::follow_up_list,
+            commands::follow_up::follow_up_due,
+            commands::follow_up::follow_up_due_count,
+            commands::follow_up::follow_up_sweep,
+            commands::follow_up::follow_up_reschedule,
+            commands::follow_up::follow_up_cancel,
+            commands::follow_up::follow_up_config_get,
+            commands::follow_up::follow_up_config_set,
+            commands::follow_up::follow_up_draft,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

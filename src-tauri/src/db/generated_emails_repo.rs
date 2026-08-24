@@ -113,6 +113,27 @@ pub async fn update_content(
     get(pool, id).await
 }
 
+/// Links a generated draft back to the scheduled follow-up it fulfils.
+pub async fn set_follow_up_link(
+    pool: &SqlitePool,
+    generated_email_id: i64,
+    follow_up_id: i64,
+) -> AppResult<()> {
+    let result = sqlx::query(
+        "UPDATE generated_emails SET follow_up_id = ?1 WHERE id = ?2 AND status = 'draft'",
+    )
+    .bind(follow_up_id)
+    .bind(generated_email_id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!(
+            "draft {generated_email_id} (must exist and still be a draft)"
+        )));
+    }
+    Ok(())
+}
+
 pub async fn set_status(
     pool: &SqlitePool,
     id: i64,

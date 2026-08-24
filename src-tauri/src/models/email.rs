@@ -60,6 +60,7 @@ pub struct GeneratedEmail {
     pub provider: Option<String>,
     pub model: Option<String>,
     pub status: String,
+    pub follow_up_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
 }

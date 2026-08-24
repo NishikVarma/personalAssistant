@@ -36,7 +36,13 @@ pub async fn application_set_status(
     id: i64,
     status: ApplicationStatus,
 ) -> AppResult<Application> {
-    applications_repo::set_status(&state.pool, id, status).await
+    let updated = applications_repo::set_status(&state.pool, id, status).await?;
+    // closing an application suppresses its pending follow-ups
+    if matches!(updated.status.as_str(), "rejected" | "withdrawn") {
+        crate::db::follow_ups_repo::suppress_for(&state.pool, id, None, "application closed")
+            .await?;
+    }
+    Ok(updated)
 }
 
 #[tauri::command]

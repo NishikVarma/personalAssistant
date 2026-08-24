@@ -86,7 +86,7 @@ async fn migration_adds_recipient_columns_and_repo_stores_them() {
 
     // schema version advanced to 0002
     let version = db::schema_version(&pool).await.unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
 }
 
 #[tokio::test]

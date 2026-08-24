@@ -244,6 +244,16 @@ pub async fn gmail_sync_replies(state: State<'_, AppState>) -> AppResult<ReplySy
             sent_at_ms,
         ) {
             crate::db::email_history_repo::record_reply(&state.pool, &sent, &reply).await?;
+            // a replied contact no longer needs pending follow-ups
+            if let Some(application_id) = sent.application_id {
+                crate::db::follow_ups_repo::suppress_for(
+                    &state.pool,
+                    application_id,
+                    sent.contact_id,
+                    "contact replied",
+                )
+                .await?;
+            }
             found += 1;
         }
     }

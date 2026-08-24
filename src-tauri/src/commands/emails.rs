@@ -80,6 +80,13 @@ pub async fn ai_generate_email(
     state: State<'_, AppState>,
     request: EmailDraftRequest,
 ) -> AppResult<GeneratedEmail> {
+    generate_email_inner(&state, request).await
+}
+
+pub(crate) async fn generate_email_inner(
+    state: &AppState,
+    request: EmailDraftRequest,
+) -> AppResult<GeneratedEmail> {
     let recipient = request.recipient_email.trim();
     if recipient.is_empty() || !recipient.contains('@') {
         return Err(AppError::InvalidInput(
@@ -96,7 +103,7 @@ pub async fn ai_generate_email(
     let request = EmailDraftRequest { contact_id, ..request };
 
     let profile_block = profile_snapshot::collect(&state.pool).await?;
-    let provider = super::ai::current_provider(&state).await?;
+    let provider = super::ai::current_provider(state).await?;
     let model = provider.model().to_string();
 
     // template memory: reuse a stored email of this type instead of writing
@@ -265,7 +272,7 @@ pub async fn email_send(
     let (message_id, thread_id) =
         gmail::send_message(&access_token, &mime::to_gmail_raw(&mime_message)).await?;
 
-    email_history_repo::record_sent(
+    let history_id = email_history_repo::record_sent(
         &state.pool,
         &email_history_repo::SentRecord {
             generated_email_id: email.id,
@@ -279,6 +286,15 @@ pub async fn email_send(
         },
     )
     .await?;
+
+    // deterministic follow-up scheduling (marking fulfilled ones sent, chaining
+    // the next round); failures here must not fail the send
+    if let Err(e) =
+        super::follow_up::schedule_after_send(state.inner(), email.application_id, email.contact_id, email.follow_up_id, history_id)
+            .await
+    {
+        eprintln!("follow-up scheduling skipped: {e}");
+    }
 
     generated_emails_repo::get(&state.pool, email.id).await
 }

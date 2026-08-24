@@ -20,7 +20,8 @@ pub struct SentRecord {
 
 /// Records a successful send and flips the draft to `sent` in one transaction,
 /// also stamping the contact's last-contacted timestamp when linked.
-pub async fn record_sent(pool: &SqlitePool, record: &SentRecord) -> AppResult<()> {
+/// Returns the new history row id (used as the originating email for follow-ups).
+pub async fn record_sent(pool: &SqlitePool, record: &SentRecord) -> AppResult<i64> {
     let ts = now();
     let mut tx = pool.begin().await?;
 
@@ -60,7 +61,15 @@ pub async fn record_sent(pool: &SqlitePool, record: &SentRecord) -> AppResult<()
     }
 
     tx.commit().await?;
-    Ok(())
+    let id: i64 = sqlx::query_scalar(
+        "SELECT id FROM email_history
+         WHERE generated_email_id = ?1 AND direction = 'outgoing'
+         ORDER BY id DESC LIMIT 1",
+    )
+    .bind(record.generated_email_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(id)
 }
 
 /// True when an email was already sent to this address within the guard window.
