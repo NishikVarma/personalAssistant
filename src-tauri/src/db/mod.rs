@@ -13,6 +13,7 @@ pub mod links_repo;
 pub mod profile_repo;
 pub mod profile_snapshot;
 pub mod projects_repo;
+pub mod resume_files_repo;
 pub mod settings_repo;
 pub mod skills_repo;
 pub mod tags_repo;

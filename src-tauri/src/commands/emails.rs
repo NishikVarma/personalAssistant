@@ -83,7 +83,7 @@ pub async fn ai_generate_email(
     generate_email_inner(&state, request).await
 }
 
-pub(crate) async fn generate_email_inner(
+pub async fn generate_email_inner(
     state: &AppState,
     request: EmailDraftRequest,
 ) -> AppResult<GeneratedEmail> {

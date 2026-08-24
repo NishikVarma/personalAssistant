@@ -47,8 +47,7 @@ async fn send_draft(pool: &SqlitePool, recipient: &str, thread_id: &str) -> Emai
     .await
     .unwrap();
 
-    let mut filter = HistoryFilter::default();
-    filter.contact_id = None;
+    let filter = HistoryFilter { contact_id: None, ..Default::default() };
     let rows = email_history_repo::list(pool, &filter).await.unwrap();
     rows.into_iter()
         .find(|r| r.direction == "outgoing")
@@ -244,12 +243,10 @@ async fn history_list_filters_by_contact_and_application() {
     .await
     .unwrap();
 
-    let mut by_app = HistoryFilter::default();
-    by_app.application_id = Some(app.id);
+    let by_app = HistoryFilter { application_id: Some(app.id), ..Default::default() };
     assert_eq!(email_history_repo::list(&pool, &by_app).await.unwrap().len(), 1);
 
-    let mut bogus = HistoryFilter::default();
-    bogus.contact_id = Some(9999);
+    let bogus = HistoryFilter { contact_id: Some(9999), ..Default::default() };
     assert!(email_history_repo::list(&pool, &bogus).await.unwrap().is_empty());
 
     let all = email_history_repo::list(&pool, &HistoryFilter::default()).await.unwrap();
@@ -275,9 +272,11 @@ async fn record_reply_inserts_incoming_row_and_flips_status() {
     assert_eq!(updated.response_status.as_deref(), Some("replied"));
 
     // incoming row linked back to the same contact/application/draft
-    let mut filter = HistoryFilter::default();
-    filter.contact_id = sent.contact_id;
-    filter.application_id = sent.application_id;
+    let filter = HistoryFilter {
+        contact_id: sent.contact_id,
+        application_id: sent.application_id,
+        ..Default::default()
+    };
     let rows = email_history_repo::list(&pool, &filter).await.unwrap();
     let incoming = rows.iter().find(|r| r.direction == "incoming").unwrap();
     assert_eq!(incoming.gmail_message_id.as_deref(), Some("reply-77"));
@@ -330,7 +329,7 @@ async fn template_crud_and_mark_used() {
 
     let created = email_templates_repo::create(
         &pool,
-        &template_input(EmailType::ColdOutreach, Some("Backend".into()), None),
+        &template_input(EmailType::ColdOutreach, Some("Backend"), None),
         "user",
     )
     .await

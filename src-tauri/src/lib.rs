@@ -1,10 +1,10 @@
-mod commands;
+pub mod commands;
 pub mod db;
 pub mod error;
 pub mod gmail;
 pub mod llm;
 pub mod models;
-mod state;
+pub mod state;
 use tauri::Manager;
 
 use crate::gmail::OauthCoordinator;
@@ -19,12 +19,15 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
-            let (pool, db_path) = tauri::async_runtime::block_on(db::init(data_dir))?;
+            let (pool, db_path) = tauri::async_runtime::block_on(db::init(data_dir.clone()))?;
+            let resumes_dir = data_dir.join("resumes");
+            std::fs::create_dir_all(&resumes_dir)?;
             app.manage(AppState {
                 pool,
                 db_path,
                 secrets: std::sync::Arc::new(KeyringStore::new()),
                 oauth: std::sync::Arc::new(OauthCoordinator::new()),
+                resumes_dir,
             });
             Ok(())
         })
@@ -129,6 +132,11 @@ pub fn run() {
             commands::follow_up::follow_up_config_get,
             commands::follow_up::follow_up_config_set,
             commands::follow_up::follow_up_draft,
+            commands::resumes::resume_file_upload,
+            commands::resumes::resume_file_list,
+            commands::resumes::resume_file_delete,
+            commands::resumes::resume_file_tex_content,
+            commands::resumes::latex_detect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

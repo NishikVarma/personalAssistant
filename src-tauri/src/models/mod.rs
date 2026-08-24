@@ -4,6 +4,7 @@ pub mod contact;
 pub mod email;
 pub mod follow_up;
 pub mod profile;
+pub mod resume;
 
 pub use ai::*;
 pub use application::*;
@@ -11,6 +12,7 @@ pub use contact::*;
 pub use email::*;
 pub use follow_up::*;
 pub use profile::*;
+pub use resume::*;
 
 use serde::{Deserialize, Serialize};
 

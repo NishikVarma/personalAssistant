@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::db::{
-    applications_repo, contacts_repo, email_history_repo, follow_ups_repo, generated_emails_repo,
+    applications_repo, contacts_repo, email_history_repo, follow_ups_repo,
     settings_repo,
 };
 use crate::error::{AppError, AppResult};
@@ -236,5 +236,5 @@ pub async fn follow_up_draft(
 
     let draft = emails::generate_email_inner(&state, request).await?;
     crate::db::generated_emails_repo::set_follow_up_link(&state.pool, draft.id, id).await?;
-    Ok(crate::db::generated_emails_repo::get(&state.pool, draft.id).await?)
+    crate::db::generated_emails_repo::get(&state.pool, draft.id).await
 }
