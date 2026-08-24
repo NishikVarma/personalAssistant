@@ -2,7 +2,23 @@ use sqlx::SqlitePool;
 
 use super::{now, required};
 use crate::error::{AppError, AppResult};
-use crate::models::profile::{Link, LinkInput};
+use crate::models::profile::{Link, LinkKind, LinkInput};
+
+/// Empty labels fall back to the kind name; custom links must be named.
+fn resolve_label(input: &LinkInput) -> AppResult<String> {
+    let trimmed = input.label.trim();
+    if !trimmed.is_empty() {
+        return Ok(trimmed.to_string());
+    }
+    match input.kind {
+        LinkKind::LinkedIn => Ok("LinkedIn".to_string()),
+        LinkKind::GitHub => Ok("GitHub".to_string()),
+        LinkKind::Portfolio => Ok("Portfolio".to_string()),
+        LinkKind::Other => Err(AppError::InvalidInput(
+            "label is required for custom links".to_string(),
+        )),
+    }
+}
 
 pub async fn list(pool: &SqlitePool) -> AppResult<Vec<Link>> {
     Ok(sqlx::query_as::<_, Link>("SELECT * FROM links ORDER BY id")
@@ -19,7 +35,7 @@ pub async fn get(pool: &SqlitePool, id: i64) -> AppResult<Link> {
 }
 
 pub async fn create(pool: &SqlitePool, input: &LinkInput) -> AppResult<Link> {
-    let label = required(&input.label, "label")?;
+    let label = resolve_label(input)?;
     let url = required(&input.url, "url")?;
     let result =
         sqlx::query("INSERT INTO links (label, url, kind, created_at) VALUES (?1, ?2, ?3, ?4)")
@@ -34,7 +50,7 @@ pub async fn create(pool: &SqlitePool, input: &LinkInput) -> AppResult<Link> {
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, input: &LinkInput) -> AppResult<Link> {
-    let label = required(&input.label, "label")?;
+    let label = resolve_label(input)?;
     let url = required(&input.url, "url")?;
     let result = sqlx::query("UPDATE links SET label = ?1, url = ?2, kind = ?3 WHERE id = ?4")
         .bind(&label)

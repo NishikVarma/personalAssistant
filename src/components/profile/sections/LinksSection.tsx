@@ -23,11 +23,11 @@ const FIELDS = [
     name: "label",
     label: "Label",
     type: "text" as const,
-    required: true,
+    dynamicRequired: (values: FormValues) => values.kind === "other",
     dynamicPlaceholder: (values: FormValues) =>
       values.kind === "other"
         ? "Custom name — e.g. Blog, Dribbble, Kaggle…"
-        : undefined,
+        : "Optional — defaults to the kind name",
   },
   { name: "url", label: "URL", type: "text" as const, required: true, full: true, placeholder: "https://…" },
 ];

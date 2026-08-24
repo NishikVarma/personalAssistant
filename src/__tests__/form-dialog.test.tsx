@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -19,13 +20,13 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("FormDialog date fields", () => {
+describe("FormDialog opt-in month/year dates", () => {
   const fields = [
     { name: "startDate", label: "Start date", type: "date" as const },
     { name: "grade", label: "Grade", type: "text" as const },
   ];
 
-  it("advances focus when a complete date is picked", () => {
+  it("hides the date picker behind an Add button when empty", () => {
     render(
       <FormDialog
         title="Test"
@@ -36,13 +37,12 @@ describe("FormDialog date fields", () => {
       />,
     );
 
-    const dateInput = screen.getByLabelText(/start date/i);
-    fireEvent.change(dateInput, { target: { value: "2026-01-15" } });
-
-    expect(document.activeElement).toBe(screen.getByLabelText(/grade/i));
+    expect(screen.getByRole("button", { name: /add start date/i })).toBeTruthy();
+    expect(screen.queryByLabelText(/start date month/i)).toBeNull();
   });
 
-  it("does not advance for incomplete dates", () => {
+  it("reveals month and year selects when the Add button is clicked", async () => {
+    const user = userEvent.setup();
     render(
       <FormDialog
         title="Test"
@@ -53,41 +53,77 @@ describe("FormDialog date fields", () => {
       />,
     );
 
-    const dateInput = screen.getByLabelText(/start date/i);
-    fireEvent.change(dateInput, { target: { value: "2026-01" } });
-
-    expect(document.activeElement).toBe(dateInput);
+    await user.click(screen.getByRole("button", { name: /add start date/i }));
+    expect(screen.getByLabelText(/start date month/i)).toBeTruthy();
+    expect(screen.getByLabelText(/start date year/i)).toBeTruthy();
   });
 
-  it("advances focus on Enter", () => {
+  it("submits YYYY-MM once both month and year are chosen", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <FormDialog
         title="Test"
         fields={fields}
         initial={{}}
-        onSubmit={async () => {}}
+        onSubmit={onSubmit}
         onClose={() => {}}
       />,
     );
 
-    const dateInput = screen.getByLabelText(/start date/i);
-    fireEvent.keyDown(dateInput, { key: "Enter" });
+    await user.click(screen.getByRole("button", { name: /add start date/i }));
+    await user.selectOptions(screen.getByLabelText(/start date month/i), "08");
+    await user.selectOptions(screen.getByLabelText(/start date year/i), "2022");
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
-    expect(document.activeElement).toBe(screen.getByLabelText(/grade/i));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ startDate: "2022-08" }));
+    });
   });
 
-  it("marks non-required dates as optional", () => {
+  it("submits an empty value when revealed but incomplete", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <FormDialog
         title="Test"
         fields={fields}
         initial={{}}
+        onSubmit={onSubmit}
+        onClose={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add start date/i }));
+    await user.selectOptions(screen.getByLabelText(/start date year/i), "2022");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ startDate: "" }));
+    });
+  });
+
+  it("removing the date returns to the Add button and clears the value", async () => {
+    const user = userEvent.setup();
+    render(
+      <FormDialog
+        title="Test"
+        fields={fields}
+        initial={{ startDate: "2022-08-01" }}
         onSubmit={async () => {}}
         onClose={() => {}}
       />,
     );
 
-    expect(screen.getByText("(optional)")).toBeTruthy();
+    // edit mode with an existing date reveals the picker pre-filled
+    const month = screen.getByLabelText(/start date month/i) as HTMLSelectElement;
+    const year = screen.getByLabelText(/start date year/i) as HTMLSelectElement;
+    expect(month.value).toBe("08");
+    expect(year.value).toBe("2022");
+
+    await user.click(screen.getByRole("button", { name: /remove start date/i }));
+    expect(screen.getByRole("button", { name: /add start date/i })).toBeTruthy();
+    expect(screen.queryByLabelText(/start date month/i)).toBeNull();
   });
 });
 
@@ -107,12 +143,23 @@ describe("Links dialog", () => {
     const labelInput = screen.getByLabelText(/label/i) as HTMLInputElement;
     expect(labelInput.placeholder).toContain("Blog");
 
-    // switching to a known kind clears the custom placeholder
+    // switching to a known kind swaps in the optional placeholder
     fireEvent.change(screen.getByLabelText(/kind/i), { target: { value: "github" } });
-    expect(labelInput.placeholder).not.toContain("Blog");
+    expect(labelInput.placeholder).toContain("Optional");
+  });
 
-    // and back to other brings it back
-    fireEvent.change(screen.getByLabelText(/kind/i), { target: { value: "other" } });
-    expect(labelInput.placeholder).toContain("Blog");
+  it("marks label required only for Other", async () => {
+    render(<LinksSection />);
+
+    const addButtons = await screen.findAllByRole("button", { name: /^add$/i });
+    fireEvent.click(addButtons[addButtons.length - 1]);
+    await screen.findByRole("dialog");
+
+    // other (default): asterisk present
+    const labelLabel = screen.getByLabelText(/label/i).closest("div")?.querySelector("label");
+    expect(labelLabel?.textContent).toContain("*");
+
+    fireEvent.change(screen.getByLabelText(/kind/i), { target: { value: "github" } });
+    expect(labelLabel?.textContent).not.toContain("*");
   });
 });

@@ -251,9 +251,7 @@ export default function Applications() {
           title={dialog.mode === "add" ? "Add application" : `Edit ${dialog.item.company}`}
           fields={FIELDS}
           initial={
-            dialog.mode === "edit"
-              ? toInitial(dialog.item)
-              : { dateDiscovered: new Date().toISOString().slice(0, 10), priority: "0" }
+            dialog.mode === "edit" ? toInitial(dialog.item) : { priority: "0" }
           }
           onSubmit={async (values) => {
             if (dialog.mode === "add") {

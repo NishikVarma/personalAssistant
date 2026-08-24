@@ -377,6 +377,50 @@ async fn certifications_achievements_links_roundtrip() {
 }
 
 #[tokio::test]
+async fn links_labels_auto_derive_from_known_kinds() {
+    let (pool, _dir) = test_pool().await;
+
+    // empty label with a known kind derives the kind name
+    let github = links_repo::create(
+        &pool,
+        &LinkInput { label: String::new(), url: "https://github.com/nishikv".to_string(), kind: LinkKind::GitHub },
+    )
+    .await
+    .unwrap();
+    assert_eq!(github.label, "GitHub");
+
+    // an explicit label always wins
+    let linkedin = links_repo::create(
+        &pool,
+        &LinkInput { label: "My profile".to_string(), url: "https://linkedin.com/in/nishikv".to_string(), kind: LinkKind::LinkedIn },
+    )
+    .await
+    .unwrap();
+    assert_eq!(linkedin.label, "My profile");
+
+    // empty label with Other is rejected
+    let custom = links_repo::create(
+        &pool,
+        &LinkInput { label: "   ".to_string(), url: "https://blog.example.com".to_string(), kind: LinkKind::Other },
+    )
+    .await;
+    assert!(matches!(custom, Err(assistant_lib::error::AppError::InvalidInput(_))));
+
+    // updating to an empty label re-derives from the kind
+    let updated = links_repo::update(
+        &pool,
+        linkedin.id,
+        &LinkInput { label: String::new(), url: linkedin.url.clone(), kind: LinkKind::LinkedIn },
+    )
+    .await
+    .unwrap();
+    assert_eq!(updated.label, "LinkedIn");
+
+    assert!(links_repo::delete(&pool, github.id).await.unwrap());
+    assert!(links_repo::delete(&pool, linkedin.id).await.unwrap());
+}
+
+#[tokio::test]
 async fn deleting_experience_cleans_up_linked_rows() {
     let (pool, _dir) = test_pool().await;
 
