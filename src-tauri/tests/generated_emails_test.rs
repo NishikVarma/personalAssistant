@@ -155,16 +155,24 @@ fn prompt_contains_profile_and_anti_fabrication_rules() {
         contact_id: None,
     };
     let profile_block = "ABOUT THE CANDIDATE\nName: Nishik Varma";
-    let prompt = build_email_prompt(&request, profile_block);
+    let prompt = build_email_prompt(&request, profile_block, None);
 
     assert!(prompt.contains("NEVER invent"));
     assert!(prompt.contains("jane@acme.com"));
     assert!(prompt.contains("job_application"));
     assert!(prompt.contains(profile_block));
     assert!(prompt.contains("\"subject\""));
+    assert!(!prompt.contains("REFERENCE TEMPLATE"));
 
-    let unknown = EmailDraftRequest { recipient_name: None, ..request };
-    assert!(build_email_prompt(&unknown, profile_block).contains("generic greeting"));
+    let unknown = EmailDraftRequest { recipient_name: None, ..request.clone() };
+    assert!(build_email_prompt(&unknown, profile_block, None).contains("generic greeting"));
+
+    // with a template hint, the reference block is embedded
+    let with_template =
+        build_email_prompt(&request, profile_block, Some("Subject: Hi\n\nOld body"));
+    assert!(with_template.contains("REFERENCE TEMPLATE"));
+    assert!(with_template.contains("Old body"));
+    assert!(with_template.contains("personalize"));
 }
 
 #[test]

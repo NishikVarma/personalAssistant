@@ -1,6 +1,9 @@
 use tauri::State;
 
-use crate::db::{contacts_repo, email_history_repo, generated_emails_repo, profile_snapshot};
+use crate::db::{
+    contacts_repo, email_history_repo, email_templates_repo, generated_emails_repo,
+    profile_snapshot,
+};
 use crate::error::{AppError, AppResult};
 use crate::gmail;
 use crate::gmail::mime::{self, Attachment};
@@ -12,9 +15,13 @@ use crate::llm::{
     GeminiProvider, LlmProvider,
 };
 use crate::models::email::{
-    EmailDraftRequest, EmailStatus, ExtractedContact, GeneratedEmail, GeneratedEmailInput,
+    EmailDraftRequest, EmailHistory, EmailStatus, EmailTemplate, EmailTemplateInput,
+    EmailType, ExtractedContact, GeneratedEmail, GeneratedEmailInput, HistoryFilter,
+    IncomingEmailInput, ResponseStatus,
 };
 use crate::state::AppState;
+
+use super::gmail as gmail_commands;
 
 const MAX_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024;
 
@@ -92,7 +99,27 @@ pub async fn ai_generate_email(
     let provider = super::ai::current_provider(&state).await?;
     let model = provider.model().to_string();
 
-    let prompt = build_email_prompt(&request, &profile_block);
+    // template memory: reuse a stored email of this type instead of writing
+    // from scratch when one exists (most relevant first)
+    let templates =
+        email_templates_repo::list(&state.pool, Some(request.email_type)).await?;
+    let chosen = email_templates_repo::choose_template(
+        &templates,
+        request.role.as_deref(),
+        request.company.as_deref(),
+    );
+    if let Some(template) = &chosen {
+        email_templates_repo::mark_used(&state.pool, template.id).await?;
+    }
+    let template_hint = chosen.as_ref().map(|t| {
+        format!(
+            "Subject: {}\n\n{}",
+            t.subject_template.as_deref().unwrap_or("(none)"),
+            t.body_template
+        )
+    });
+
+    let prompt = build_email_prompt(&request, &profile_block, template_hint.as_deref());
     let raw = provider.complete(prompt).await?;
     let (subject, body) = parse_email_response(&raw)?;
 
@@ -227,7 +254,7 @@ pub async fn email_send(
         None => None,
     };
 
-    let (access_token, account_email) = super::gmail::fresh_access_token(&state).await?;
+    let (access_token, account_email) = gmail_commands::fresh_access_token(&state).await?;
     let mime_message = mime::build_mime(
         &account_email,
         &recipient,
@@ -254,4 +281,102 @@ pub async fn email_send(
     .await?;
 
     generated_emails_repo::get(&state.pool, email.id).await
+}
+
+// ---------- email history ----------
+
+#[tauri::command]
+pub async fn email_history_list(
+    state: State<'_, AppState>,
+    filter: HistoryFilter,
+) -> AppResult<Vec<EmailHistory>> {
+    email_history_repo::list(&state.pool, &filter).await
+}
+
+#[tauri::command]
+pub async fn email_history_set_response(
+    state: State<'_, AppState>,
+    id: i64,
+    status: Option<ResponseStatus>,
+) -> AppResult<EmailHistory> {
+    email_history_repo::set_response_status(&state.pool, id, status).await
+}
+
+#[tauri::command]
+pub async fn email_history_record_incoming(
+    state: State<'_, AppState>,
+    input: IncomingEmailInput,
+) -> AppResult<EmailHistory> {
+    email_history_repo::record_incoming(&state.pool, &input).await
+}
+
+// ---------- email templates ----------
+
+#[tauri::command]
+pub async fn email_template_list(
+    state: State<'_, AppState>,
+    email_type: Option<EmailType>,
+) -> AppResult<Vec<EmailTemplate>> {
+    email_templates_repo::list(&state.pool, email_type).await
+}
+
+#[tauri::command]
+pub async fn email_template_create(
+    state: State<'_, AppState>,
+    input: EmailTemplateInput,
+) -> AppResult<EmailTemplate> {
+    email_templates_repo::create(&state.pool, &input, "user").await
+}
+
+#[tauri::command]
+pub async fn email_template_update(
+    state: State<'_, AppState>,
+    id: i64,
+    input: EmailTemplateInput,
+) -> AppResult<EmailTemplate> {
+    email_templates_repo::update(&state.pool, id, &input).await
+}
+
+#[tauri::command]
+pub async fn email_template_delete(state: State<'_, AppState>, id: i64) -> AppResult<bool> {
+    email_templates_repo::delete(&state.pool, id).await
+}
+
+/// Copies an existing draft (its subject + body) into a reusable template.
+#[tauri::command]
+pub async fn email_template_save_from_email(
+    state: State<'_, AppState>,
+    id: i64,
+) -> AppResult<EmailTemplate> {
+    let email = generated_emails_repo::get(&state.pool, id).await?;
+    if email.status == EmailStatus::Discarded.as_str() {
+        return Err(AppError::InvalidInput(
+            "discarded drafts cannot become templates".to_string(),
+        ));
+    }
+    let email_type = EmailType::try_from_str(&email.email_type)
+        .ok_or_else(|| AppError::InvalidInput(format!("unknown email type '{}'", email.email_type)))?;
+
+    // role/company come from the linked application when there is one
+    let (role, company) = match email.application_id {
+        Some(app_id) => {
+            let row: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+                "SELECT role, company FROM applications WHERE id = ?1",
+            )
+            .bind(app_id)
+            .fetch_optional(&state.pool)
+            .await?;
+            row.unwrap_or((None, None))
+        }
+        None => (None, None),
+    };
+
+    let input = EmailTemplateInput {
+        email_type,
+        role,
+        company_or_industry: company,
+        subject_template: email.subject.clone(),
+        body_template: email.body.clone(),
+    };
+    email_templates_repo::create(&state.pool, &input, "generated").await
 }

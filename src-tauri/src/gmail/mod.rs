@@ -111,3 +111,147 @@ pub async fn send_message(
         .map(String::from);
     Ok((id, thread_id))
 }
+
+/// A detected reply to one of our sent emails, ready for history recording.
+pub struct ParsedReply {
+    pub gmail_message_id: String,
+    pub from_email: String,
+    pub subject: Option<String>,
+    pub snippet: Option<String>,
+    pub occurred_at: String,
+}
+
+pub struct ThreadMessage {
+    pub id: String,
+    pub from_email: Option<String>,
+    pub subject: Option<String>,
+    pub snippet: Option<String>,
+    pub internal_date_ms: Option<i64>,
+}
+
+/// Extracts the bare address from a From header like `"Jane" <jane@acme.com>`.
+pub fn extract_email_address(from_header: &str) -> Option<String> {
+    let trimmed = from_header.trim();
+    if let Some(open) = trimmed.rfind('<') {
+        let close = trimmed[open..].find('>')? + open;
+        return Some(trimmed[open + 1..close].trim().to_string());
+    }
+    if trimmed.contains('@') {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
+}
+
+fn header_value(message: &serde_json::Value, name: &str) -> Option<String> {
+    message
+        .pointer("/payload/headers")
+        .and_then(|headers| headers.as_array())
+        .and_then(|headers| {
+            headers
+                .iter()
+                .find(|h| {
+                    h.get("name").and_then(|n| n.as_str()).map(|n| n.eq_ignore_ascii_case(name)).unwrap_or(false)
+                })
+                .and_then(|h| h.get("value"))
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        })
+}
+
+/// Parses a Gmail threads.get (format=metadata) response body.
+pub fn parse_thread_messages(body: &serde_json::Value) -> Vec<ThreadMessage> {
+    let mut out = Vec::new();
+    if let Some(messages) = body.get("messages").and_then(|m| m.as_array()) {
+        for message in messages {
+            let id = match message.get("id").and_then(|v| v.as_str()) {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+            let internal_date_ms = message
+                .get("internalDate")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<i64>().ok());
+            out.push(ThreadMessage {
+                id,
+                from_email: header_value(message, "From").and_then(|h| extract_email_address(&h)),
+                subject: header_value(message, "Subject"),
+                snippet: message
+                    .get("snippet")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                internal_date_ms,
+            });
+        }
+    }
+    out
+}
+
+/// Finds the first message in a thread that is a genuine reply: not ours,
+/// from a different sender, newer than our sent message.
+pub fn find_reply(
+    messages: &[ThreadMessage],
+    own_email: &str,
+    own_message_id: Option<&str>,
+    sent_at_ms: i64,
+) -> Option<ParsedReply> {
+    let mut candidate: Option<&ThreadMessage> = None;
+    for message in messages {
+        if Some(message.id.as_str()) == own_message_id {
+            continue;
+        }
+        match &message.from_email {
+            Some(email) if !email.eq_ignore_ascii_case(own_email) => {}
+            _ => continue,
+        }
+        if message.internal_date_ms.unwrap_or(0) <= sent_at_ms {
+            continue;
+        }
+        if candidate
+            .map(|c| c.internal_date_ms.unwrap_or(0) < message.internal_date_ms.unwrap_or(0))
+            .unwrap_or(true)
+        {
+            candidate = Some(message);
+        }
+    }
+    candidate.map(|m| ParsedReply {
+        gmail_message_id: m.id.clone(),
+        from_email: m.from_email.clone().unwrap_or_default(),
+        subject: m.subject.clone(),
+        snippet: m.snippet.clone(),
+        occurred_at: internal_date_to_rfc3339(m.internal_date_ms),
+    })
+}
+
+fn internal_date_to_rfc3339(ms: Option<i64>) -> String {
+    ms.and_then(chrono::DateTime::from_timestamp_millis)
+        .unwrap_or_else(chrono::Utc::now)
+        .to_rfc3339()
+}
+
+/// Fetches a thread (metadata only: headers + snippet, no bodies).
+pub async fn fetch_thread_metadata(
+    access_token: &str,
+    thread_id: &str,
+) -> AppResult<serde_json::Value> {
+    let response = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?
+        .get(format!(
+            "https://gmail.googleapis.com/gmail/v1/users/me/threads/{thread_id}"
+        ))
+        .bearer_auth(access_token)
+        .query(&[("format", "metadata")])
+        .send()
+        .await?;
+
+    let status = response.status();
+    let body = response.text().await?;
+    if !status.is_success() {
+        return Err(AppError::InvalidInput(format!(
+            "Gmail thread fetch failed (HTTP {status})"
+        )));
+    }
+    serde_json::from_str(&body)
+        .map_err(|e| AppError::InvalidInput(format!("could not parse Gmail thread: {e}")))
+}

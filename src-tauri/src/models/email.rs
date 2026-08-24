@@ -19,6 +19,12 @@ str_enum!(EmailStatus {
     Discarded => "discarded",
 });
 
+str_enum!(ResponseStatus {
+    Awaiting => "awaiting",
+    Replied => "replied",
+    NoReplyNeeded => "no_reply_needed",
+});
+
 impl EmailStatus {
     /// Deterministic transition rules owned by application code, never the AI.
     pub fn can_transition_to(self, next: EmailStatus) -> bool {
@@ -90,4 +96,73 @@ pub struct EmailDraftRequest {
 pub struct ExtractedContact {
     pub name: Option<String>,
     pub organization: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailHistory {
+    pub id: i64,
+    pub direction: String,
+    pub application_id: Option<i64>,
+    pub contact_id: Option<i64>,
+    pub generated_email_id: Option<i64>,
+    pub gmail_message_id: Option<String>,
+    pub gmail_thread_id: Option<String>,
+    pub email_type: Option<String>,
+    pub recipient_email: Option<String>,
+    pub subject: Option<String>,
+    pub body: String,
+    pub delivery_method: Option<String>,
+    pub status: String,
+    pub response_status: Option<String>,
+    pub occurred_at: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryFilter {
+    pub contact_id: Option<i64>,
+    pub application_id: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomingEmailInput {
+    pub contact_id: Option<i64>,
+    pub application_id: Option<i64>,
+    pub sender_email: String,
+    pub email_type: Option<EmailType>,
+    pub subject: Option<String>,
+    pub body: String,
+    pub occurred_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplate {
+    pub id: i64,
+    pub email_type: String,
+    pub role: Option<String>,
+    pub company_or_industry: Option<String>,
+    pub subject_template: Option<String>,
+    pub body_template: String,
+    pub variables_json: String,
+    pub source: String,
+    pub success_count: i64,
+    pub times_used: i64,
+    pub last_used_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailTemplateInput {
+    pub email_type: EmailType,
+    pub role: Option<String>,
+    pub company_or_industry: Option<String>,
+    pub subject_template: Option<String>,
+    pub body_template: String,
 }

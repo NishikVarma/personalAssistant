@@ -200,3 +200,59 @@ pub(crate) async fn fresh_access_token(state: &AppState) -> AppResult<(String, S
     }
     Ok((tokens.access_token, account_email))
 }
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplySyncResult {
+    pub checked: i64,
+    pub replies_found: i64,
+}
+
+/// Polls Gmail threads of sent emails still awaiting a response and records
+/// any replies found (deterministic detection, capped at 50 threads per run).
+#[tauri::command]
+pub async fn gmail_sync_replies(state: State<'_, AppState>) -> AppResult<ReplySyncResult> {
+    let (access_token, account_email) = fresh_access_token(&state).await?;
+    let awaiting = crate::db::email_history_repo::awaiting_with_threads(&state.pool, 50).await?;
+
+    let mut checked: i64 = 0;
+    let mut found: i64 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for sent in awaiting {
+        checked += 1;
+        let thread_id = match &sent.gmail_thread_id {
+            Some(id) => id.clone(),
+            None => continue,
+        };
+        let thread = match gmail::fetch_thread_metadata(&access_token, &thread_id).await {
+            Ok(t) => t,
+            Err(e) => {
+                errors.push(format!("thread {thread_id}: {e}"));
+                continue;
+            }
+        };
+
+        let sent_at_ms = chrono::DateTime::parse_from_rfc3339(&sent.occurred_at)
+            .map(|dt| dt.timestamp_millis())
+            .unwrap_or(0);
+        let messages = gmail::parse_thread_messages(&thread);
+        if let Some(reply) = gmail::find_reply(
+            &messages,
+            &account_email,
+            sent.gmail_message_id.as_deref(),
+            sent_at_ms,
+        ) {
+            crate::db::email_history_repo::record_reply(&state.pool, &sent, &reply).await?;
+            found += 1;
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(AppError::InvalidInput(format!(
+            "synced with errors: {}",
+            errors.join("; ")
+        )));
+    }
+    Ok(ReplySyncResult { checked, replies_found: found })
+}

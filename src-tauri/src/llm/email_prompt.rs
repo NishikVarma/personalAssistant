@@ -26,7 +26,12 @@ fn type_purpose(email_type: EmailType) -> &'static str {
 
 /// Builds the generation prompt. The candidate facts block is the ONLY source
 /// of truth the model may draw from — fabrication is explicitly forbidden.
-pub fn build_email_prompt(request: &EmailDraftRequest, profile_block: &str) -> String {
+/// When a stored template matches, it is passed in as an adaptation reference.
+pub fn build_email_prompt(
+    request: &EmailDraftRequest,
+    profile_block: &str,
+    template_hint: Option<&str>,
+) -> String {
     let mut prompt = String::new();
 
     prompt.push_str(
@@ -68,6 +73,16 @@ pub fn build_email_prompt(request: &EmailDraftRequest, profile_block: &str) -> S
     prompt.push_str("\nCANDIDATE VERIFIED PROFILE:\n");
     prompt.push_str(profile_block);
     prompt.push_str("\n\n");
+
+    if let Some(hint) = template_hint {
+        prompt.push_str(
+            "REFERENCE TEMPLATE — a previously successful email of this type:\n\
+             Reuse its structure and tone; personalize all names, company, role and\n\
+             specifics for this recipient. Do not copy irrelevant details verbatim.\n---\n",
+        );
+        prompt.push_str(hint);
+        prompt.push_str("\n---\n\n");
+    }
 
     prompt.push_str(
         "Respond with ONLY a JSON object — no markdown fences, no commentary — exactly:\n\

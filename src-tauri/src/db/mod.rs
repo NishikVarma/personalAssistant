@@ -5,6 +5,7 @@ pub mod certifications_repo;
 pub mod contacts_repo;
 pub mod education_repo;
 pub mod email_history_repo;
+pub mod email_templates_repo;
 pub mod experience_repo;
 pub mod generated_emails_repo;
 pub mod links_repo;

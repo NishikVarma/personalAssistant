@@ -104,12 +104,21 @@ pub fn run() {
             commands::emails::ai_generate_email,
             commands::emails::ai_extract_contact,
             commands::emails::email_send,
+            commands::emails::email_history_list,
+            commands::emails::email_history_set_response,
+            commands::emails::email_history_record_incoming,
+            commands::emails::email_template_list,
+            commands::emails::email_template_create,
+            commands::emails::email_template_update,
+            commands::emails::email_template_delete,
+            commands::emails::email_template_save_from_email,
             commands::gmail::google_set_client_secret,
             commands::gmail::google_has_client_secret,
             commands::gmail::google_begin_connect,
             commands::gmail::google_complete_connect,
             commands::gmail::google_status,
             commands::gmail::google_disconnect,
+            commands::gmail::gmail_sync_replies,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
