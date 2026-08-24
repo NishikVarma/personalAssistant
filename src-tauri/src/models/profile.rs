@@ -72,12 +72,39 @@ str_enum!(SkillCategory {
     Other => "other",
 });
 
-str_enum!(LinkKind {
-    LinkedIn => "linkedin",
-    GitHub => "github",
-    Portfolio => "portfolio",
-    Other => "other",
-});
+/// Written by hand (not the macro) because the schema uses "linkedin"/"github",
+/// which snake_case of the variant names would render as "linked_in"/"git_hub".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkKind {
+    #[serde(rename = "linkedin")]
+    LinkedIn,
+    #[serde(rename = "github")]
+    GitHub,
+    Portfolio,
+    Other,
+}
+
+impl LinkKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LinkedIn => "linkedin",
+            Self::GitHub => "github",
+            Self::Portfolio => "portfolio",
+            Self::Other => "other",
+        }
+    }
+
+    pub fn try_from_str(value: &str) -> Option<Self> {
+        match value {
+            "linkedin" => Some(Self::LinkedIn),
+            "github" => Some(Self::GitHub),
+            "portfolio" => Some(Self::Portfolio),
+            "other" => Some(Self::Other),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]

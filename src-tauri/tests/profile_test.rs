@@ -376,6 +376,29 @@ async fn certifications_achievements_links_roundtrip() {
     .is_err());
 }
 
+#[test]
+fn link_kind_deserializes_schema_values_from_ipc() {
+    // mirrors exactly what the frontend sends over IPC
+    let input: LinkInput = serde_json::from_str(
+        r#"{"label":"","url":"https://linkedin.com/in/nishikv","kind":"linkedin"}"#,
+    )
+    .unwrap();
+    assert_eq!(input.kind, LinkKind::LinkedIn);
+    assert_eq!(input.kind.as_str(), "linkedin");
+
+    let input: LinkInput = serde_json::from_str(
+        r#"{"label":"","url":"https://github.com/nishikv","kind":"github"}"#,
+    )
+    .unwrap();
+    assert_eq!(input.kind, LinkKind::GitHub);
+
+    for kind in [LinkKind::LinkedIn, LinkKind::GitHub, LinkKind::Portfolio, LinkKind::Other] {
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, format!("\"{}\"", kind.as_str()));
+        assert_eq!(LinkKind::try_from_str(kind.as_str()), Some(kind));
+    }
+}
+
 #[tokio::test]
 async fn links_labels_auto_derive_from_known_kinds() {
     let (pool, _dir) = test_pool().await;
