@@ -39,7 +39,7 @@ function renderPage() {
 beforeEach(() => {
   invokeMock.mockReset();
   openMock.mockReset();
-  invokeMock.mockImplementation((command: string) => {
+  invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
     switch (command) {
       case "resume_file_list":
         return Promise.resolve(args?.kind === "pdf_master" ? [PDF] : []);
