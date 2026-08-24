@@ -102,7 +102,9 @@ the OS keyring; Gmail passwords are never stored).
 - applications (5): application_list(status filter)/create/update/set_status/delete
 - ai (7): ai_get_config / set_model / set_api_key / clear_api_key / test_connection /
   generate_email / extract_contact
-- emails (6): generated_email_list(status filter)/get/create/update/set_status/delete
+- emails (7): generated_email_list(status filter)/get/create/update/set_status/delete/send
+- gmail (6): google_set_client_secret / has_client_secret / begin_connect /
+  complete_connect / status / disconnect
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -124,10 +126,27 @@ role, job description, context, email type) and (b) a deterministic profile snap
 from every filled-in career-profile table (`db/profile_snapshot.rs`, capped ~8k chars). The
 prompt forbids inventing anything absent from that snapshot. The model returns strict JSON
 `{subject, body}`, parsed tolerantly (`llm/email_prompt.rs`). Drafts persist in
-`generated_emails` with provider/model provenance; `draft → edited → approved → sent`
-transitions are validated in the repo (`sent`/`discarded` are terminal). Existing contacts
-are auto-linked by exact email match. Sending is Phase 8 — until then the UI offers copy,
-save-edit and approve only.
+`generated_emails` with recipient + provider/model provenance; `draft → edited → approved →
+sent` transitions are validated in the repo (`sent`/`discarded` are terminal). Existing
+contacts are auto-linked by exact email match.
+
+## Gmail Sending (implemented)
+
+- OAuth 2.0 desktop loopback flow: `google_begin_connect` binds a local listener and returns
+  the consent URL (scopes: `openid email gmail.send`); the frontend opens the browser and
+  `google_complete_connect` exchanges the code. The **refresh token lives in the OS keyring**
+  via `SecretStore`; `oauth_accounts` stores only account metadata. Client secret is also
+  keyring-backed.
+- `email_send` requires `approved` status, resolves the recipient (stored on the draft or
+  via the linked contact), refreshes the access token, builds RFC 2822 MIME (multipart when
+  a file is attached), sends through the Gmail REST API, then transactionally records the
+  send in `email_history`, flips the draft to `sent` and stamps the contact's
+  last-contacted time.
+- **Duplicate-outreach guard**: sends to an address already emailed within 7 days are
+  rejected (`AppError::RecentOutreach`) until the user explicitly overrides in the
+  confirmation dialog.
+- Migration `0002_email_recipients.sql` adds recipient columns to `generated_emails` and
+  `email_history`.
 
 ## Implemented Capabilities (as of this spec)
 
@@ -142,8 +161,8 @@ Development plan from the original project brief — 17 incremental steps:
 | 5  | Basic application tracking                      | Done   |
 | 6  | Gemini integration (LLMProvider implementation) | Done   |
 | 7  | Single-email generation                         | Done   |
-| 8  | Gmail OAuth and sending                         | Next   |
-| 9  | Email history                                   | –      |
+| 8  | Gmail OAuth and sending                         | Done   |
+| 9  | Email history                                   | Next   |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
 | 12 | Career profile extraction/verification          | –      |

@@ -330,6 +330,8 @@ export interface GeneratedEmail {
   applicationId: number | null;
   contactId: number | null;
   emailType: EmailType;
+  recipientEmail: string | null;
+  recipientName: string | null;
   subject: string | null;
   body: string;
   provider: string | null;
@@ -343,6 +345,8 @@ export interface GeneratedEmailInput {
   applicationId: number | null;
   contactId: number | null;
   emailType: EmailType;
+  recipientEmail: string | null;
+  recipientName: string | null;
   subject: string | null;
   body: string;
 }
@@ -362,6 +366,15 @@ export interface EmailDraftRequest {
 export interface ExtractedContact {
   name: string | null;
   organization: string | null;
+}
+
+export interface GmailStatus {
+  connected: boolean;
+  accountEmail: string | null;
+}
+
+export interface ConnectStart {
+  authUrl: string;
 }
 
 export const ipc = {
@@ -505,5 +518,16 @@ export const ipc = {
     setStatus: (id: number, status: EmailStatus) =>
       invoke<GeneratedEmail>("generated_email_set_status", { id, status }),
     remove: (id: number) => invoke<boolean>("generated_email_delete", { id }),
+    send: (id: number, attachmentPath: string | null, force: boolean) =>
+      invoke<GeneratedEmail>("email_send", { id, attachmentPath, force }),
+  },
+
+  gmail: {
+    status: () => invoke<GmailStatus>("google_status"),
+    setClientSecret: (secret: string) => invoke<void>("google_set_client_secret", { secret }),
+    hasClientSecret: () => invoke<boolean>("google_has_client_secret"),
+    beginConnect: () => invoke<ConnectStart>("google_begin_connect"),
+    completeConnect: () => invoke<GmailStatus>("google_complete_connect"),
+    disconnect: () => invoke<boolean>("google_disconnect"),
   },
 };

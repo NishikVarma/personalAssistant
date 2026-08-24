@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
-import { Check, ClipboardCopy, Mail, Pencil, Sparkles, Wand2 } from "lucide-react";
+import { Check, ClipboardCopy, Mail, Paperclip, Pencil, Send, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { open } from "@tauri-apps/plugin-dialog";
 import DeleteButton from "@/components/profile/DeleteButton";
 import EmptyState from "@/components/EmptyState";
 import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -19,6 +28,7 @@ import {
   type EmailStatus,
   type EmailType,
   type GeneratedEmail,
+  type GmailStatus,
 } from "@/lib/ipc";
 
 const EMAIL_TYPE_LABELS: Record<EmailType, string> = {
@@ -77,6 +87,13 @@ export default function Emails() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
+  const [attachmentPath, setAttachmentPath] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [forceSend, setForceSend] = useState(false);
+  const [sendWarning, setSendWarning] = useState<string | null>(null);
 
   const reloadList = () => {
     ipc.generatedEmail
@@ -92,6 +109,10 @@ export default function Emails() {
       .list()
       .then(setApplications)
       .catch(() => setApplications([]));
+    ipc.gmail
+      .status()
+      .then(setGmailStatus)
+      .catch(() => setGmailStatus(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -155,6 +176,8 @@ export default function Emails() {
     setSubjectDraft(email.subject ?? "");
     setBodyDraft(email.body);
     setNotice(null);
+    setAttachmentPath(null);
+    setAttachmentName(null);
   };
 
   const dirty =
@@ -200,7 +223,7 @@ export default function Emails() {
       setSelected(updated);
       reloadList();
       if (status === "approved") {
-        toast.success("Draft approved — ready to send once Gmail is connected");
+        toast.success("Draft approved — ready to send");
       } else {
         toast.success(`Marked ${STATUS_LABELS[status].toLowerCase()}`);
       }
@@ -219,6 +242,47 @@ export default function Emails() {
       toast.success("Copied to clipboard");
     } else {
       toast.error("Could not access the clipboard");
+    }
+  };
+
+  const pickAttachment = async () => {
+    const file = await open({ multiple: false, title: "Attach a file" });
+    if (typeof file === "string") {
+      setAttachmentPath(file);
+      setAttachmentName(file.split(/[\\/]/).pop() ?? file);
+      toast.message("Attachment ready", { description: file });
+    }
+  };
+
+  const openSendDialog = () => {
+    setForceSend(false);
+    setSendWarning(null);
+    setSendDialogOpen(true);
+  };
+
+  const sendEmail = async (force: boolean) => {
+    if (!selected) return;
+    setSending(true);
+    try {
+      const sent = await ipc.generatedEmail.send(selected.id, attachmentPath, force);
+      setSelected(sent);
+      setSendDialogOpen(false);
+      setSendWarning(null);
+      setForceSend(false);
+      setAttachmentPath(null);
+      setAttachmentName(null);
+      reloadList();
+      toast.success(`Email sent to ${sent.recipientEmail ?? "recipient"}`);
+    } catch (e) {
+      const message = String(e);
+      if (message.toLowerCase().includes("recent outreach")) {
+        setSendWarning(message);
+      } else {
+        toast.error(message);
+        setSendDialogOpen(false);
+      }
+    } finally {
+      setSending(false);
     }
   };
 
@@ -416,15 +480,34 @@ export default function Emails() {
                 </Button>
                 {selected.status === "sent" ? null : (
                   <>
-                    {!["approved", "sent", "discarded"].includes(selected.status) ? (
-                      <Button
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => void changeStatus("approved")}
-                      >
-                        Approve
-                      </Button>
-                    ) : null}
+                {!["approved", "sent", "discarded"].includes(selected.status) ? (
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void changeStatus("approved")}
+                  >
+                    Approve
+                  </Button>
+                ) : null}
+                {selected.status === "approved" ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => void pickAttachment()}>
+                      <Paperclip /> {attachmentName ?? "Attach file"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={busy || !gmailStatus?.connected}
+                      title={
+                        gmailStatus?.connected
+                          ? "Send via Gmail"
+                          : "Connect Gmail in Settings first"
+                      }
+                      onClick={openSendDialog}
+                    >
+                      <Send /> Send via Gmail
+                    </Button>
+                  </>
+                ) : null}
                     <DeleteButton
                       confirmLabel="Discard draft"
                       cancelLabel="Keep"
@@ -449,6 +532,67 @@ export default function Emails() {
             </div>
           </SectionCard>
         ) : null}
+
+        <Dialog open={sendDialogOpen} onOpenChange={(o) => !o && setSendDialogOpen(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Send this email?</DialogTitle>
+              <DialogDescription>
+                Review everything below — this sends for real via Gmail.
+              </DialogDescription>
+            </DialogHeader>
+            {selected ? (
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="text-muted-foreground">To: </span>
+                  <span className="font-medium">
+                    {selected.recipientEmail ?? "linked contact's address"}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Subject: </span>
+                  {subjectDraft || "(no subject)"}
+                </p>
+                {attachmentName ? (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Paperclip className="h-3.5 w-3.5" /> {attachmentName}
+                  </p>
+                ) : null}
+                <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">
+                  {bodyDraft}
+                </pre>
+                {sendWarning ? (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs">
+                    <p className="text-destructive">{sendWarning}</p>
+                    <label className="mt-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={forceSend}
+                        onChange={(e) => setForceSend(e.target.checked)}
+                      />
+                      Send anyway
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setSendDialogOpen(false)}
+                disabled={sending}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={sending || (Boolean(sendWarning) && !forceSend)}
+                onClick={() => void sendEmail(forceSend)}
+              >
+                {sending ? "Sending…" : "Send"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <SectionCard title={`History${emails.length ? ` (${emails.length})` : ""}`}>
           {loading ? (
