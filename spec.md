@@ -152,6 +152,16 @@ contacts are auto-linked by exact email match.
 - Migration `0002_email_recipients.sql` adds recipient columns to `generated_emails` and
   `email_history`.
 
+## Follow-up System (implemented)
+
+- Every sent email linked to an application auto-schedules a follow-up (+N days,
+  configurable, default 7; optional second round). Toggle in the Follow-ups page.
+- Deterministic suppression: contact replied (detected by reply sync or manual logging) or
+  application rejected/withdrawn -> pending follow-ups are suppressed with a reason.
+- The Follow-ups page shows Due / Upcoming / Completed lists with draft-generation
+  (AI writes from prior thread context), day-precision rescheduling and cancellation.
+- Desktop notification fires when the app opens with due follow-ups (deduped per day).
+
 ## Email History, Templates & Reply Sync (implemented)
 
 - Every send is recorded in `email_history` (direction, Gmail ids, recipient, response
