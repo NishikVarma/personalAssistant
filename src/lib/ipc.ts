@@ -438,6 +438,28 @@ export interface ConnectStart {
   authUrl: string;
 }
 
+export type FollowUpStatus = "pending" | "due" | "sent" | "cancelled" | "suppressed";
+
+export interface FollowUp {
+  id: number;
+  applicationId: number;
+  contactId: number | null;
+  originatingEmailId: number | null;
+  sequence: number;
+  scheduledFor: string;
+  status: FollowUpStatus;
+  suppressedReason: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FollowUpConfig {
+  days: number;
+  secondDays: number | null;
+  autoSchedule: boolean;
+}
+
 export const ipc = {
   appInfo: () => invoke<AppInfo>("get_app_info"),
   getSetting: (key: string) => invoke<string | null>("get_setting", { key }),
@@ -609,5 +631,24 @@ export const ipc = {
     completeConnect: () => invoke<GmailStatus>("google_complete_connect"),
     disconnect: () => invoke<boolean>("google_disconnect"),
     syncReplies: () => invoke<{ checked: number; repliesFound: number }>("gmail_sync_replies"),
+  },
+
+  followUp: {
+    list: (status?: FollowUpStatus | null) =>
+      invoke<FollowUp[]>("follow_up_list", { status: status ?? undefined }),
+    due: () => invoke<FollowUp[]>("follow_up_due"),
+    dueCount: () => invoke<number>("follow_up_due_count"),
+    sweep: () => invoke<number>("follow_up_sweep"),
+    reschedule: (id: number, scheduledFor: string) =>
+      invoke<FollowUp>("follow_up_reschedule", { id, scheduledFor }),
+    cancel: (id: number) => invoke<FollowUp>("follow_up_cancel", { id }),
+    configGet: () => invoke<FollowUpConfig>("follow_up_config_get"),
+    configSet: (config: FollowUpConfig) =>
+      invoke<FollowUpConfig>("follow_up_config_set", {
+        days: config.days,
+        secondDays: config.secondDays,
+        autoSchedule: config.autoSchedule,
+      }),
+    draft: (id: number) => invoke<GeneratedEmail>("follow_up_draft", { id }),
   },
 };

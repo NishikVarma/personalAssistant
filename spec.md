@@ -107,6 +107,8 @@ the OS keyring; Gmail passwords are never stored).
   email_template_list/create/update/delete
 - gmail (7): google_set_client_secret / has_client_secret / begin_connect /
   complete_connect / status / disconnect / sync_replies
+- follow_ups (9): follow_up_list / due / due_count / sweep / reschedule / cancel /
+  config_get / config_set / draft
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -182,7 +184,8 @@ Development plan from the original project brief — 17 incremental steps:
 | 7  | Single-email generation                         | Done   |
 | 8  | Gmail OAuth and sending                         | Done   |
 | 9  | Email history                                   | Done   |
-| 10 | Follow-up scheduling/notifications              | Next   |
+| 10 | Follow-up scheduling/notifications              | Done   |
+| 11 | Resume PDF import                               | Next   |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
 | 12 | Career profile extraction/verification          | –      |

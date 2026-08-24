@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -62,7 +63,7 @@ afterEach(cleanup);
 
 describe("Emails send flow", () => {
   it("shows Send via Gmail for approved drafts when connected", async () => {
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await userEvent.setup().click(await screen.findByText(/application for backend role/i));
     expect(await screen.findByRole("button", { name: /send via gmail/i })).toBeTruthy();
@@ -78,7 +79,7 @@ describe("Emails send flow", () => {
             ? Promise.resolve([])
             : Promise.resolve(null),
     );
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await userEvent.setup().click(await screen.findByText(/application for backend role/i));
     const button = await screen.findByRole("button", { name: /send via gmail/i });
@@ -87,7 +88,7 @@ describe("Emails send flow", () => {
 
   it("sends through the confirmation dialog", async () => {
     const user = userEvent.setup();
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await user.click(await screen.findByText(/application for backend role/i));
     await user.click(await screen.findByRole("button", { name: /send via gmail/i }));
@@ -133,7 +134,7 @@ describe("Emails send flow", () => {
       }
     });
     const user = userEvent.setup();
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await user.click(await screen.findByText(/application for backend role/i));
     await user.click(await screen.findByRole("button", { name: /send via gmail/i }));

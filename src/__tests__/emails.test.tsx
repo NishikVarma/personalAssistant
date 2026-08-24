@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,7 +58,7 @@ afterEach(cleanup);
 
 describe("Emails page", () => {
   it("renders compose form and existing drafts", async () => {
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     expect(screen.getByText("Compose")).toBeTruthy();
     expect(await screen.findByText(/exploring backend roles/i)).toBeTruthy();
@@ -66,7 +67,7 @@ describe("Emails page", () => {
 
   it("generates a draft through IPC and opens it in the editor", async () => {
     const user = userEvent.setup();
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await user.type(await screen.findByLabelText(/recipient email/i), "jane@acme.com");
     await user.click(screen.getByRole("button", { name: /generate draft/i }));
@@ -88,7 +89,7 @@ describe("Emails page", () => {
 
   it("loads a history item into the editor on click", async () => {
     const user = userEvent.setup();
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await user.click(await screen.findByText(/exploring backend roles/i));
     expect(await screen.findByDisplayValue(/reaching out/i)).toBeTruthy();
@@ -97,7 +98,7 @@ describe("Emails page", () => {
 
   it("saves edits and flips draft to edited via IPC", async () => {
     const user = userEvent.setup();
-    render(<Emails />);
+    render(<MemoryRouter><Emails /></MemoryRouter>);
 
     await user.click(await screen.findByText(/exploring backend roles/i));
     const bodyBox = screen.getByLabelText(/^body/i);

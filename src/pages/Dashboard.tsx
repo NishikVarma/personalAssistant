@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  BellRing,
   Briefcase,
   CheckCircle2,
   FileText,
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ipc, type AppInfo, type ApplicationStatus, type GeneratedEmail } from "@/lib/ipc";
+import { notifyDueFollowUps } from "@/lib/notifications";
 
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
   saved: "Saved",
@@ -104,6 +106,7 @@ export default function Dashboard() {
   const [apps, setApps] = useState<{ count: number; byStatus: Partial<Record<ApplicationStatus, number>>; recent: { id: number; company: string; role: string; status: ApplicationStatus; updatedAt: string }[] } | null>(null);
   const [contactCount, setContactCount] = useState<number | null>(null);
   const [emails, setEmails] = useState<GeneratedEmail[] | null>(null);
+  const [dueCount, setDueCount] = useState<number | null>(null);
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +140,13 @@ export default function Dashboard() {
       .list()
       .then(setEmails)
       .catch((e) => setError(String(e)));
+    ipc.followUp
+      .dueCount()
+      .then((count) => {
+        setDueCount(count);
+        void notifyDueFollowUps(count);
+      })
+      .catch(() => setDueCount(null));
   }, []);
 
   const draftsInProgress =
@@ -161,11 +171,12 @@ export default function Dashboard() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard icon={Briefcase} label="Applications" value={apps?.count ?? null} hint="Total tracked" to="/applications" />
         <StatCard icon={Users} label="Contacts" value={contactCount} hint="Recruiters & referrals" to="/contacts" />
         <StatCard icon={FileText} label="Drafts in progress" value={draftsInProgress} hint="Not yet approved" to="/emails" />
         <StatCard icon={Mail} label="Approved ready" value={approvedReady} hint="Waiting to send" to="/emails" />
+        <StatCard icon={BellRing} label="Follow-ups due" value={dueCount} hint="Need action" to="/follow-ups" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

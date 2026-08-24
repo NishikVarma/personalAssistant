@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Check, ClipboardCopy, FileOutput, Mail, Paperclip, Pencil, Send, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -79,6 +80,7 @@ const EMPTY_COMPOSE: ComposeState = {
 };
 
 export default function Emails() {
+  const location = useLocation();
   const [compose, setCompose] = useState<ComposeState>(EMPTY_COMPOSE);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -121,6 +123,15 @@ export default function Emails() {
       .status()
       .then(setGmailStatus)
       .catch(() => setGmailStatus(null));
+    // a follow-up draft created on the Follow-ups page lands here
+    const draftId = (location.state as { draftId?: number } | null)?.draftId;
+    if (draftId) {
+      ipc.generatedEmail
+        .get(draftId)
+        .then(loadDraft)
+        .catch(() => {});
+      window.history.replaceState({}, "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
