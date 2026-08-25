@@ -505,6 +505,51 @@ export interface JdAnalysis {
   recommendedCategory: string | null;
 }
 
+export type BulkBatchStatus = "draft" | "sending" | "sent" | "failed";
+
+export interface BulkBatch {
+  id: number;
+  emailType: EmailType;
+  applicationId: number | null;
+  status: BulkBatchStatus;
+  totalCount: number;
+  sentCount: number;
+  failedCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BulkImportPreview {
+  headers: string[];
+  sampleRows: string[][];
+  totalDataRows: number;
+}
+
+export interface BulkColumnMapping {
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  jobDescription: string;
+}
+
+export interface BulkRowStatus {
+  rowIndex: number;
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  status: "ready" | "invalid" | "duplicate" | "failed";
+  detail: string | null;
+  generatedEmailId: number | null;
+}
+
+export interface BulkGenerateConfig {
+  role: string | null;
+  company: string | null;
+  jobDescription: string | null;
+}
+
 export interface ExtractedEducation {
   institution: string;
   degree: string;
@@ -795,6 +840,25 @@ export const ipc = {
   },
 
   resumeMatch: (jdText: string) => invoke<JdAnalysis>("resume_match_jd", { jdText }),
+
+  bulk: {
+    importPreview: (sourcePath: string) =>
+      invoke<BulkImportPreview>("bulk_import_preview", { sourcePath }),
+    batchCreate: (emailType: EmailType, applicationId: number | null) =>
+      invoke<BulkBatch>("bulk_batch_create", { emailType, applicationId }),
+    batchList: () => invoke<BulkBatch[]>("bulk_batch_list"),
+    batchGet: (id: number) => invoke<BulkBatch>("bulk_batch_get", { id }),
+    generate: (
+      batchId: number,
+      sourcePath: string,
+      mapping: BulkColumnMapping,
+      config: BulkGenerateConfig,
+    ) => invoke<BulkRowStatus[]>("bulk_generate", { batchId, sourcePath, mapping, config }),
+    removeDraft: (batchId: number, draftId: number) =>
+      invoke<boolean>("bulk_batch_remove_draft", { batchId, draftId }),
+    batchFinish: (id: number, status: "sent" | "failed") =>
+      invoke<BulkBatch>("bulk_batch_finish", { id, status }),
+  },
 
   resumeVariant: {
     list: (applicationId?: number | null) =>

@@ -7,11 +7,12 @@ import Dashboard from "@/pages/Dashboard";
 import Emails from "@/pages/Emails";
 import FollowUps from "@/pages/FollowUps";
 import Placeholder from "@/pages/Placeholder";
+import Bulk from "@/pages/Bulk";
 import Resumes from "@/pages/Resumes";
 import Settings from "@/pages/Settings";
 import { SECTIONS } from "@/lib/sections";
 
-const BUILT_SECTIONS = new Set(["/career-profile", "/contacts", "/applications", "/emails", "/follow-ups", "/resumes"]);
+const BUILT_SECTIONS = new Set(["/career-profile", "/contacts", "/applications", "/emails", "/follow-ups", "/resumes", "/bulk"]);
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/emails" element={<Emails />} />
           <Route path="/follow-ups" element={<FollowUps />} />
           <Route path="/resumes" element={<Resumes />} />
+          <Route path="/bulk" element={<Bulk />} />
           {SECTIONS.filter((s) => s.phase && !BUILT_SECTIONS.has(s.path)).map(
             ({ path, label, phase, icon }) => (
               <Route
