@@ -8,22 +8,30 @@ Everything runs on your machine: the database is local SQLite, API keys live in 
 operating system's secure credential storage, and nothing is ever sent without your explicit
 confirmation.
 
-## Current capabilities
+## Current capabilities — the full loop
 
 - **Career profile** — identity, education, experience, projects, skills, resume bullets,
-  certifications, achievements and links, each with verified/unverified flags. This is the
-  single source of truth every generated email draws from.
+  certifications, achievements and links, each with verified/unverified flags. Import an
+  existing resume PDF and the AI structures it for your review. This is the single source
+  of truth every generated email and resume draws from.
 - **Contacts** — recruiters/referrals with organizations, roles, notes, tags, search and
   last-contacted tracking.
 - **Applications** — track opportunities through eleven statuses (`saved` → `applied` →
   `interview` → `offer` …) with priority, dates, job URLs and notes.
 - **AI email drafts** — generate cold outreach, applications, referral requests,
   follow-ups, internship inquiries or status checks grounded strictly in your verified
-  profile. The AI is forbidden from inventing experience, technologies, metrics or claims;
-  drafts land in an editor where you can revise, approve, discard or copy them.
+  profile, then send directly via Gmail (with attachments) after an explicit confirmation.
+- **Follow-ups** — scheduled automatically after outreach, suppressed the moment a contact
+  replies, with desktop notifications and one-click AI-drafted follow-ups.
+- **Resumes** — immutable master PDF + LaTeX template storage; AI tailors your template to
+  a job description (compiles to PDF when LaTeX is installed); JD↔profile matching shows
+  honest skill gaps.
+- **Bulk outreach** — import a CSV/XLSX, map columns, generate personalized drafts for
+  every recipient, review, and send in paced batches (2s apart, max 50 per run) behind an
+  explicit confirmation.
 
-Still ahead (see `spec.md` roadmap): Gmail OAuth sending, follow-up scheduling, resume PDF
-import and LaTeX generation, JD↔resume matching, bulk CSV/XLSX outreach.
+Intentionally out of scope for v1: browser extension / Google Forms assistance, keyboard
+shortcuts, non-Gmail providers.
 
 ## Prerequisites
 

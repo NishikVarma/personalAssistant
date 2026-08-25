@@ -1,6 +1,6 @@
 [package]
 name = "assistant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Job Application Copilot - local-first job application and outreach assistant"
 authors = ["Nishik Varma <nishikvonline@gmail.com>"]
 edition = "2021"

@@ -5,7 +5,7 @@ application and outreach tasks while requiring explicit user confirmation before
 consequential action (e.g. sending email).
 
 Stack: **Tauri 2 · React 19 + TypeScript · Rust · SQLite/SQLx · Gemini 2.5 Flash behind a
-replaceable `LlmProvider` abstraction · Gmail API/OAuth 2.0 (planned)**.
+replaceable `LlmProvider` abstraction · Gmail API/OAuth 2.0**.
 
 ## Architectural Principles
 
@@ -230,22 +230,15 @@ Development plan from the original project brief — 17 incremental steps:
 | 13 | LaTeX template import                           | Done   |
 | 14 | Resume generation                               | Done   |
 | 15 | Resume/JD matching                              | Done   |
-| 16 | Bulk CSV/XLSX outreach                          | Next   |
-| 10 | Follow-up scheduling/notifications              | –      |
-| 11 | Resume PDF import                               | –      |
-| 12 | Career profile extraction/verification          | –      |
-| 13 | LaTeX template import                           | –      |
-| 14 | Resume generation                               | –      |
-| 15 | Resume/JD matching                              | –      |
-| 16 | Bulk CSV/XLSX outreach                          | –      |
-| 17 | Testing, error handling, security hardening     | Ongoing|
+| 16 | Bulk CSV/XLSX outreach                          | Done   |
+| 17 | Testing, error handling, security hardening     | Done   |
 
-Deferred by design (not defects): contact history display lands with the email phase;
-duplicate/recent-outreach warnings are send-time logic in the email phase; Dashboard does
-not yet aggregate application/contact stats.
+Deferred by design (not defects): Gmail reply threading beyond the poll-based sync;
+browser extension / Google Forms assistance; keyboard shortcuts. All core flows
+(history, dashboard aggregation, outreach warnings) are implemented.
 
-Planned but intentionally not implemented yet: browser extension / Google Forms support,
-bulk outreach, resume generation pipeline, Gmail integration.
+Intentionally out of scope for v1: browser extension / Google Forms support,
+keyboard shortcuts, non-Gmail email providers.
 
 ## Security & Privacy Rules
 
