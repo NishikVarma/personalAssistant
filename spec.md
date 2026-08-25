@@ -90,7 +90,7 @@ the OS keyring; Gmail passwords are never stored).
 
 ## IPC Surface
 
-62 commands registered in `src-tauri/src/lib.rs`:
+121 commands registered in `src-tauri/src/lib.rs`:
 
 - settings (4): get/set/delete_setting, get_app_info
 - profile (43): profile_get/update/set_verified; education/experience/project CRUD +
@@ -100,20 +100,21 @@ the OS keyring; Gmail passwords are never stored).
 - contacts (10): contact_list(search)/create/update/delete/set_last_contacted;
   tag_list/create/delete; contact_list_tags/replace_tags
 - applications (5): application_list(status filter)/create/update/set_status/delete
-- ai (7): ai_get_config / set_model / set_api_key / clear_api_key / test_connection /
-  generate_email / extract_contact
-- emails (12): generated_email_list/get/create/update/set_status/delete/send/
-  save_as_template; email_history_list(filter)/set_response/record_incoming;
-  email_template_list/create/update/delete
+- ai (5): ai_get_config / set_model / set_api_key / clear_api_key / test_connection
+- emails (17): generated_email_list/get/create/update/set_status/delete/send/
+  save_as_template; email_history_list/set_response/record_incoming;
+  email_template_list/create/update/delete; ai_generate_email/ai_extract_contact
 - gmail (7): google_set_client_secret / has_client_secret / begin_connect /
   complete_connect / status / disconnect / sync_replies
 - follow_ups (9): follow_up_list / due / due_count / sweep / reschedule / cancel /
   config_get / config_set / draft
-- resumes (8): resume_file_upload (content-addressed, dedup) / list / delete /
+- resumes (14): resume_file_upload (content-addressed, dedup) / list / delete /
   tex_content / latex_detect / extract_profile / extract_from_text /
-  profile_import_extracted
-- resume matching & variants (7): resume_match_jd / resume_generate_variant /
-  resume_variant_list / tex_content / approve / delete
+  profile_import_extracted / resume_match_jd / resume_generate_variant /
+  resume_variant_list / resume_variant_tex_content / resume_variant_approve /
+  resume_variant_delete
+- bulk (7): bulk_import_preview / batch_create / batch_list / batch_get /
+  generate / batch_remove_draft / batch_finish
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -181,6 +182,19 @@ contacts are auto-linked by exact email match.
 - Compose integration: drafts pre-attach the user's default resume (set per PDF on the
   Resumes page); the editor can auto-match the best variant from the linked application's
   JD. Compose defaults (role + email type) are saved once and reused.
+
+## Bulk Outreach (implemented)
+
+- Import a CSV or XLSX (`csv` + `calamine`, first sheet): headers + sample rows preview,
+  then column mapping with auto-guessed defaults (email column required).
+- `bulk_generate` validates every row (invalid emails flagged), detects in-file and
+  existing-contact duplicates, auto-creates contact rows, and generates a personalized
+  draft per valid recipient — grounded in the verified profile with template memory reuse.
+- The review table shows per-recipient status (ready / invalid / duplicate / failed) with
+  draft preview, inline removal and exact send counts.
+- Sending is **frontend-driven and paced**: explicit confirmation, sequential
+  `email_send` calls 2 seconds apart, hard cap of 50 per run (resumable), failures logged
+  without aborting. Batch totals and status are persisted (`bulk_batches`).
 
 ## Follow-up System (implemented)
 
