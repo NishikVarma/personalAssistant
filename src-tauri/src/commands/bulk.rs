@@ -164,7 +164,59 @@ pub async fn bulk_generate(
     mapping: BulkColumnMapping,
     config: BulkGenerateConfig,
 ) -> AppResult<Vec<BulkRowStatus>> {
+    bulk_generate_inner(&state, batch_id, &source_path, &mapping, &config).await
+}
+
+pub async fn bulk_generate_inner(
+    state: &AppState,
+    batch_id: i64,
+    source_path: &str,
+    mapping: &BulkColumnMapping,
+    config: &BulkGenerateConfig,
+) -> AppResult<Vec<BulkRowStatus>> {
     let batch = bulk_batches_repo::get(&state.pool, batch_id).await?;
+    generate_batch_inner(state, &batch, source_path, mapping, config, &HashSet::new()).await
+}
+
+/// Retries generation for rows that do not yet have a draft in the batch —
+/// e.g. rows that failed on Gemini rate limits. Rows with existing drafts are
+/// left untouched.
+#[tauri::command]
+pub async fn bulk_retry_failed(
+    state: State<'_, AppState>,
+    batch_id: i64,
+    source_path: String,
+    mapping: BulkColumnMapping,
+    config: BulkGenerateConfig,
+) -> AppResult<Vec<BulkRowStatus>> {
+    bulk_retry_failed_inner(&state, batch_id, &source_path, &mapping, &config).await
+}
+
+pub async fn bulk_retry_failed_inner(
+    state: &AppState,
+    batch_id: i64,
+    source_path: &str,
+    mapping: &BulkColumnMapping,
+    config: &BulkGenerateConfig,
+) -> AppResult<Vec<BulkRowStatus>> {
+    let batch = bulk_batches_repo::get(&state.pool, batch_id).await?;
+    let existing = generated_emails_repo::list_by_batch(&state.pool, batch_id).await?;
+    let done: HashSet<String> = existing
+        .iter()
+        .filter_map(|d| d.recipient_email.as_ref().map(|e| e.to_lowercase()))
+        .collect();
+    generate_batch_inner(state, &batch, source_path, mapping, config, &done).await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn generate_batch_inner(
+    state: &AppState,
+    batch: &BulkBatch,
+    source_path: &str,
+    mapping: &BulkColumnMapping,
+    config: &BulkGenerateConfig,
+    skip_emails: &HashSet<String>,
+) -> AppResult<Vec<BulkRowStatus>> {
     if batch.status != "draft" {
         return Err(AppError::InvalidInput(format!(
             "batch is {} — only draft batches can be generated",
@@ -220,12 +272,17 @@ pub async fn bulk_generate(
         }
         let email = email_raw.to_lowercase();
 
-        if !seen_emails.insert(email.clone()) {
-            row_status.status = "duplicate".to_string();
-            row_status.detail = Some("duplicate email in this file".to_string());
-            statuses.push(row_status);
+        // rows already generated in this batch are silently skipped on retry
+        if skip_emails.contains(&email) || seen_emails.contains(&email) {
+            if seen_emails.contains(&email) {
+                row_status.status = "duplicate".to_string();
+                row_status.detail = Some("duplicate email in this file".to_string());
+                statuses.push(row_status);
+            }
             continue;
         }
+        seen_emails.insert(email.clone());
+
         if contacts_repo::find_id_by_email(&state.pool, &email)
             .await?
             .is_some()
@@ -273,9 +330,9 @@ pub async fn bulk_generate(
             contact_id,
         };
 
-        match emails::generate_email_inner(&state, request).await {
+        match emails::generate_email_inner(state, request).await {
             Ok(draft) => {
-                generated_emails_repo::set_bulk_batch_link(&state.pool, draft.id, batch_id)
+                generated_emails_repo::set_bulk_batch_link(&state.pool, draft.id, batch.id)
                     .await?;
                 row_status.generated_email_id = Some(draft.id);
             }
@@ -291,7 +348,7 @@ pub async fn bulk_generate(
         .iter()
         .filter(|s| s.generated_email_id.is_some())
         .count() as i64;
-    bulk_batches_repo::set_total(&state.pool, batch_id, generated).await?;
+    bulk_batches_repo::set_total(&state.pool, batch.id, generated).await?;
 
     Ok(statuses)
 }

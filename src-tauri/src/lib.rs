@@ -137,6 +137,7 @@ pub fn run() {
             commands::bulk::bulk_batch_list,
             commands::bulk::bulk_batch_get,
             commands::bulk::bulk_generate,
+            commands::bulk::bulk_retry_failed,
             commands::bulk::bulk_batch_remove_draft,
             commands::bulk::bulk_batch_finish,
             commands::resumes::resume_file_upload,
