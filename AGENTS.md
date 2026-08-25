@@ -27,15 +27,33 @@ npm run tauri dev
 
 ## Architecture Map
 
-- `src-tauri/src/lib.rs` — Tauri builder, DB init, command registration.
-- `src-tauri/src/models/` — serde/sqlx structs. One module per domain. camelCase at the IPC boundary.
-- `src-tauri/src/db/` — repos own all SQL and input validation; one file per domain; shared helpers (`now`, `required`, `optional`) in `db/mod.rs`.
-- `src-tauri/src/commands/` — thin `#[tauri::command]` wrappers; register every command in `lib.rs`.
-- `src-tauri/src/error.rs` — `AppError`; serializes to a string for the frontend.
-- `src-tauri/tests/` — integration tests per domain against temp SQLite DBs.
-- `src/lib/ipc.ts` — typed interfaces + invoke wrappers grouped as `ipc.{domain}.{action}`.
-- `src/pages/`, `src/components/` — pages and reusable UI (`components/ui` = shadcn-style primitives).
-- `src/lib/sections.ts` + `src/App.tsx` — sidebar registry and route wiring.
+Status: all 17 roadmap phases shipped (v0.2.0); see the roadmap table in `spec.md`.
+
+Backend (`src-tauri/src/`):
+
+- `lib.rs` — Tauri builder, DB init + migrations (0001–0004), command registration.
+- `models/` — serde/sqlx structs. One module per domain. camelCase at the IPC boundary.
+- `db/` — repos own all SQL and input validation; one file per domain (contacts, applications,
+  profile, resumes, resume_variants, generated_emails, bulk_batches, email_history, follow_ups,
+  settings, ...); shared helpers (`now`, `required`, `optional`) in `db/mod.rs`.
+- `commands/` — thin `#[tauri::command]` wrappers across 11 domains (ai, applications, bulk,
+  contacts, emails, follow_up, gmail, profile, resumes, settings); register every command in `lib.rs`.
+- `gmail/` — Gmail integration: `oauth.rs` (device-code OAuth flow, token persistence),
+  `mime.rs` (RFC 2822 MIME building with attachments, reply threading, sent-message sync).
+- `llm/` — the only place Gemini is called: `LlmProvider` trait in `mod.rs`, prompt builders
+  (`email_prompt.rs`, `extract_prompt.rs`, `jd_prompt.rs`), API-key handling in `secrets.rs`.
+- `error.rs` — `AppError`; serializes to a string for the frontend.
+- `tests/` — integration tests per domain against temp SQLite DBs.
+
+Frontend (`src/`):
+
+- `lib/ipc.ts` — typed interfaces + invoke wrappers grouped as `ipc.{domain}.{action}`.
+- `pages/` — Dashboard, Contacts, Applications, Emails, Resumes, CareerProfile, FollowUps,
+  Bulk, Settings.
+- `components/` — `ui/` holds shadcn-style primitives; `contacts/`, `emails/`, `profile/`,
+  `resumes/` hold domain widgets.
+- `lib/sections.ts` + `App.tsx` — sidebar registry and route wiring; `lib/notifications.ts`
+  (toast system), `lib/theme.ts` (light/dark).
 
 ## Adding a New Entity (checklist)
 
