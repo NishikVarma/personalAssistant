@@ -333,7 +333,9 @@ export default function FollowUps({ onDueCountChange }: FollowUpsProps = {}) {
 
         {finished.length > 0 ? (
           <SectionCard title={`Completed & suppressed (${finished.length})`}>
-            <ul className="divide-y">{finished.map((row) => renderRow(row, false))}</ul>
+            <ul className="max-h-80 divide-y overflow-y-auto pr-1">
+              {finished.map((row) => renderRow(row, false))}
+            </ul>
           </SectionCard>
         ) : null}
       </div>

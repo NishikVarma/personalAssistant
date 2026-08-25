@@ -90,7 +90,7 @@ export default function TemplatesCard() {
           description="Save an approved draft as a template, or add one manually — generation will reuse it."
         />
       ) : (
-        <ul className="divide-y">
+        <ul className="max-h-80 divide-y overflow-y-auto pr-1">
           {templates.map((t) => (
             <li key={t.id} className="group flex items-center gap-3 py-3 text-sm first:pt-0 last:pb-0">
               <div className="min-w-0 flex-1">

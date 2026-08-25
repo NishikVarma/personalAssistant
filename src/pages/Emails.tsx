@@ -34,6 +34,7 @@ import {
   type GeneratedEmail,
   type GmailStatus,
   type ResumeFile,
+  type ResumeVariant,
 } from "@/lib/ipc";
 
 const EMAIL_TYPE_LABELS: Record<EmailType, string> = {
@@ -98,7 +99,9 @@ export default function Emails() {
   const [attachmentPath, setAttachmentPath] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const [resumeFiles, setResumeFiles] = useState<ResumeFile[]>([]);
+  const [variants, setVariants] = useState<ResumeVariant[]>([]);
   const [defaultResumeId, setDefaultResumeId] = useState<number | null>(null);
+  const [matchingResume, setMatchingResume] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [forceSend, setForceSend] = useState(false);
@@ -130,6 +133,10 @@ export default function Emails() {
       .list("pdf_master")
       .then((rows) => setResumeFiles(Array.isArray(rows) ? rows : []))
       .catch(() => setResumeFiles([]));
+    ipc.resumeVariant
+      .list()
+      .then((rows) => setVariants(Array.isArray(rows) ? rows : []))
+      .catch(() => setVariants([]));
     ipc
       .getSetting("compose.default_resume_id")
       .then((v) => v && setDefaultResumeId(Number(v)))
@@ -295,6 +302,58 @@ export default function Emails() {
       files.find((f) => f.id === defaultResumeId) ?? files[0]; // list is newest-first
     setAttachmentPath(chosen.storedPath);
     setAttachmentName(chosen.originalFilename);
+  };
+
+  /** All attachable resumes: tailored variants first (best match wins), then masters. */
+  const attachmentOptions = [
+    ...variants.map((variant) => ({
+      value: (variant.pdfPath ?? variant.texPath) as string,
+      label: `${variant.label} (.${variant.pdfPath ? "pdf" : "tex"}${variant.status === "approved" ? ", approved" : ""})`,
+    })),
+    ...resumeFiles.map((file) => ({
+      value: file.storedPath,
+      label: `${file.originalFilename}${file.id === defaultResumeId ? " (default)" : ""}`,
+    })),
+  ];
+
+  /** Picks the best resume for this draft's JD: recommended category variant, else default. */
+  const autoMatchResume = async () => {
+    if (!selected?.applicationId) {
+      toast.error("Link the draft to an application with a job description first.");
+      return;
+    }
+    const app = applications.find((a) => a.id === selected.applicationId);
+    const jd = app?.jobDescription?.trim();
+    if (!jd || jd.length < 40) {
+      toast.error("The linked application has no job description to match against.");
+      return;
+    }
+    setMatchingResume(true);
+    try {
+      const analysis = await ipc.resumeMatch(jd);
+      const category = analysis.recommendedCategory;
+      const best =
+        variants.find(
+          (v) => v.category === category && (v.pdfPath || v.texPath),
+        ) ?? null;
+      if (best) {
+        setAttachmentPath((best.pdfPath ?? best.texPath) as string);
+        setAttachmentName(best.label);
+        toast.success(
+          `Matched: ${analysis.matchedSkills.length} skills in common. Attached "${best.label}" (${category}).`,
+        );
+      } else {
+        applyDefaultAttachment(null);
+        toast.message(
+          `No tailored variant for "${category}" yet — attached your default resume.`,
+          { description: `Missing: ${analysis.missingSkills.join(", ") || "nothing major"}` },
+        );
+      }
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setMatchingResume(false);
+    }
   };
 
   const copyBody = async () => {
@@ -558,8 +617,45 @@ export default function Emails() {
                 ) : null}
                 {selected.status === "approved" ? (
                   <>
+                    {attachmentOptions.length > 0 ? (
+                      <Select
+                        className="h-7 w-56 text-xs"
+                        aria-label="Attached resume"
+                        value={
+                          attachmentPath &&
+                          attachmentOptions.some((opt) => opt.value === attachmentPath)
+                            ? attachmentPath
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const chosen = attachmentOptions.find(
+                            (opt) => opt.value === e.target.value,
+                          );
+                          setAttachmentPath(chosen ? chosen.value : null);
+                          setAttachmentName(chosen ? chosen.label.split(" (")[0] : null);
+                        }}
+                      >
+                        <option value="">No resume attached</option>
+                        {attachmentOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : null}
+                    {selected.applicationId ? (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        disabled={matchingResume}
+                        title="Analyze the application's JD and attach the best-matching resume"
+                        onClick={() => void autoMatchResume()}
+                      >
+                        <Sparkles /> {matchingResume ? "Matching…" : "Auto-match"}
+                      </Button>
+                    ) : null}
                     <Button variant="outline" size="sm" onClick={() => void pickAttachment()}>
-                      <Paperclip /> {attachmentName ?? "Attach file"}
+                      <Paperclip /> {attachmentName ?? "Browse"}
                     </Button>
                     <Button
                       size="sm"

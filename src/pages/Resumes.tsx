@@ -1,11 +1,22 @@
 import { useEffect, useState } from "react";
-import { FileText, HardDriveDownload, ShieldCheck, Sparkles, Star, Upload } from "lucide-react";
+import {
+  Check,
+  FileText,
+  HardDriveDownload,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Upload,
+  Wand2,
+} from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import DeleteButton from "@/components/profile/DeleteButton";
 import SectionCard from "@/components/profile/SectionCard";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +34,9 @@ import {
   type ResumeFile,
   type ResumeFileKind,
   type ImportCounts,
+  type Application,
+  type JdAnalysis,
+  type ResumeVariant,
 } from "@/lib/ipc";
 
 function formatSize(bytes: number): string {
@@ -92,11 +106,18 @@ export default function Resumes() {
   const [latex, setLatex] = useState<LatexStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [viewing, setViewing] = useState<{ file: ResumeFile; content: string } | null>(null);
+  const [viewing, setViewing] = useState<{ title: string; content: string } | null>(null);
   const [extractingId, setExtractingId] = useState<number | null>(null);
   const [review, setReview] = useState<ExtractedProfile | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [genAppId, setGenAppId] = useState("");
+  const [genJd, setGenJd] = useState("");
+  const [matching, setMatching] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [match, setMatch] = useState<JdAnalysis | null>(null);
+  const [variants, setVariants] = useState<ResumeVariant[]>([]);
 
   const reload = () => {
     Promise.all([
@@ -122,6 +143,21 @@ export default function Resumes() {
       .catch(() => {});
   }, []);
 
+  const reloadVariants = () => {
+    ipc.resumeVariant
+      .list()
+      .then((rows) => setVariants(Array.isArray(rows) ? rows : []))
+      .catch(() => setVariants([]));
+  };
+
+  useEffect(() => {
+    ipc.application
+      .list()
+      .then((rows) => setApplications(Array.isArray(rows) ? rows : []))
+      .catch(() => setApplications([]));
+    reloadVariants();
+  }, []);
+
   const setDefaultResume = async (id: number) => {
     try {
       await ipc.setSetting("compose.default_resume_id", String(id));
@@ -137,6 +173,56 @@ export default function Resumes() {
       await ipc.deleteSetting("compose.default_resume_id");
       setDefaultResumeId(null);
       toast.success("Default resume cleared");
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  const runMatch = async () => {
+    if (genJd.trim().length < 40) {
+      toast.error("Paste a fuller job description first.");
+      return;
+    }
+    setMatching(true);
+    try {
+      setMatch(await ipc.resumeMatch(genJd.trim()));
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const generate = async () => {
+    if (genJd.trim().length < 40) {
+      toast.error("Paste a fuller job description first.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const variant = await ipc.resumeVariant.generate(
+        genJd.trim(),
+        templates[0]?.id ?? null,
+        genAppId ? Number(genAppId) : null,
+      );
+      toast.success(
+        variant.pdfPath
+          ? "Tailored resume generated and compiled to PDF"
+          : "Tailored .tex generated (no LaTeX engine found for PDF)",
+      );
+      setMatch(null);
+      reloadVariants();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const viewVariantTex = async (variant: ResumeVariant) => {
+    try {
+      const content = await ipc.resumeVariant.texContent(variant.id);
+      setViewing({ title: `${variant.label}.tex`, content });
     } catch (e) {
       toast.error(String(e));
     }
@@ -199,7 +285,7 @@ export default function Resumes() {
   const viewTemplate = async (file: ResumeFile) => {
     try {
       const content = await ipc.resumeFile.texContent(file.id);
-      setViewing({ file, content });
+      setViewing({ title: file.originalFilename, content });
     } catch (e) {
       toast.error(String(e));
     }
@@ -300,6 +386,136 @@ export default function Resumes() {
           )}
         </SectionCard>
 
+        <SectionCard
+          title="Generate tailored resume"
+          description="Matches the job description against your verified profile, then rewrites your .tex template. Only verified facts are used."
+          action={
+            <Button onClick={() => void generate()} disabled={generating || genJd.trim().length < 40}>
+              <Wand2 /> {generating ? "Generating…" : "Generate"}
+            </Button>
+          }
+        >
+          <div className="space-y-3">
+            <div>
+              <Label className="mb-1 text-xs">From application (auto-fills the JD)</Label>
+              <Select
+                value={genAppId}
+                onChange={(e) => {
+                  setGenAppId(e.target.value);
+                  const app = applications.find((a) => String(a.id) === e.target.value);
+                  if (app?.jobDescription) setGenJd(app.jobDescription);
+                }}
+              >
+                <option value="">Paste a JD manually</option>
+                {applications.map((app) => (
+                  <option key={app.id} value={app.id}>
+                    {app.company} · {app.role}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Textarea
+              rows={5}
+              value={genJd}
+              placeholder="Paste the job description…"
+              onChange={(e) => setGenJd(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={matching || genJd.trim().length < 40}
+              onClick={() => void runMatch()}
+            >
+              <Sparkles /> {matching ? "Analyzing…" : "Match against profile"}
+            </Button>
+            {match ? (
+              <div className="space-y-1.5 rounded-lg border border-border p-3 text-xs">
+                <p className="font-medium">
+                  {match.role}
+                  {match.seniority ? ` · ${match.seniority}` : ""}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {match.matchedSkills.map((skill: string) => (
+                    <Badge key={skill} variant="default">
+                      ✓ {skill}
+                    </Badge>
+                  ))}
+                  {match.missingSkills.map((skill: string) => (
+                    <Badge key={skill} variant="destructive">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+                {match.missingSkills.length > 0 ? (
+                  <p className="text-muted-foreground">
+                    Missing skills are shown honestly — never claim them.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        {variants.length > 0 ? (
+          <SectionCard title={`Tailored variants (${variants.length})`}>
+            <ul className="max-h-80 divide-y overflow-y-auto pr-1">
+              {variants.map((variant) => (
+                <li
+                  key={variant.id}
+                  className="group flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      {variant.label}
+                      <Badge variant="outline">{variant.category}</Badge>
+                      <Badge variant={variant.status === "approved" ? "default" : "secondary"}>
+                        {variant.status}
+                      </Badge>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {variant.pdfPath ? "PDF compiled" : ".tex only (no LaTeX engine)"} ·{" "}
+                      {new Date(variant.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="xs" onClick={() => void viewVariantTex(variant)}>
+                    View .tex
+                  </Button>
+                  {variant.status === "draft" ? (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={async () => {
+                        try {
+                          await ipc.resumeVariant.approve(variant.id);
+                          toast.success("Variant approved — ready to attach");
+                          reloadVariants();
+                        } catch (e) {
+                          toast.error(String(e));
+                        }
+                      }}
+                    >
+                      <Check /> Approve
+                    </Button>
+                  ) : null}
+                  <DeleteButton
+                    confirmLabel="Delete"
+                    cancelLabel="Keep"
+                    onConfirm={async () => {
+                      try {
+                        await ipc.resumeVariant.remove(variant.id);
+                        toast.success("Variant deleted");
+                        reloadVariants();
+                      } catch (e) {
+                        toast.error(String(e));
+                      }
+                    }}
+                  />
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        ) : null}
+
         <SectionCard title="How storage works">
           <ul className="space-y-1.5 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
@@ -366,7 +582,7 @@ export default function Resumes() {
         <Dialog open onOpenChange={(o) => !o && setViewing(null)}>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{viewing.file.originalFilename}</DialogTitle>
+              <DialogTitle>{viewing.title}</DialogTitle>
               <DialogDescription>LaTeX source (read-only)</DialogDescription>
             </DialogHeader>
             <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">

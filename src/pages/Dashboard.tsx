@@ -282,7 +282,7 @@ export default function Dashboard() {
             ) : apps.recent.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing here yet.</p>
             ) : (
-              <ul className="divide-y">
+              <ul className="max-h-56 divide-y overflow-y-auto pr-1">
                 {apps.recent.map((app) => (
                   <li key={app.id} className="flex items-center gap-2 py-2 text-sm first:pt-0 last:pb-0">
                     <span className="min-w-0 flex-1 truncate">
@@ -318,7 +318,7 @@ export default function Dashboard() {
             ) : emails.length === 0 ? (
               <p className="text-sm text-muted-foreground">No drafts yet.</p>
             ) : (
-              <ul className="divide-y">
+              <ul className="max-h-56 divide-y overflow-y-auto pr-1">
                 {emails.slice(0, 5).map((email) => (
                   <li key={email.id} className="flex items-center gap-2 py-2 text-sm first:pt-0 last:pb-0">
                     <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

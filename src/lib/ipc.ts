@@ -479,6 +479,32 @@ export interface LatexStatus {
   engine: string | null;
 }
 
+export type ResumeVariantStatus = "draft" | "approved" | "archived";
+
+export interface ResumeVariant {
+  id: number;
+  baseFileId: number | null;
+  applicationId: number | null;
+  category: string;
+  label: string;
+  texPath: string | null;
+  pdfPath: string | null;
+  status: ResumeVariantStatus;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JdAnalysis {
+  role: string;
+  seniority: string;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  matchedSkills: string[];
+  missingSkills: string[];
+  recommendedCategory: string | null;
+}
+
 export interface ExtractedEducation {
   institution: string;
   degree: string;
@@ -766,6 +792,18 @@ export const ipc = {
       invoke<ExtractedProfile>("resume_extract_from_text", { text }),
     importExtracted: (profile: ExtractedProfile, markVerified: boolean) =>
       invoke<ImportCounts>("profile_import_extracted", { profile, markVerified }),
+  },
+
+  resumeMatch: (jdText: string) => invoke<JdAnalysis>("resume_match_jd", { jdText }),
+
+  resumeVariant: {
+    list: (applicationId?: number | null) =>
+      invoke<ResumeVariant[]>("resume_variant_list", { applicationId: applicationId ?? undefined }),
+    generate: (jdText: string, templateId: number | null, applicationId: number | null) =>
+      invoke<ResumeVariant>("resume_generate_variant", { jdText, templateId, applicationId }),
+    texContent: (id: number) => invoke<string>("resume_variant_tex_content", { id }),
+    approve: (id: number) => invoke<ResumeVariant>("resume_variant_approve", { id }),
+    remove: (id: number) => invoke<boolean>("resume_variant_delete", { id }),
   },
 
   latexDetect: () => invoke<LatexStatus>("latex_detect"),

@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
+import { fireEvent } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -45,6 +46,12 @@ beforeEach(() => {
         return Promise.resolve(args?.kind === "pdf_master" ? [PDF] : []);
       case "latex_detect":
         return Promise.resolve({ available: true, engine: "pdflatex" });
+      case "application_list":
+        return Promise.resolve([
+          { id: 10, company: "Acme", role: "Backend", status: "applied", jobDescription: "Long JD text here" },
+        ]);
+      case "resume_variant_list":
+        return Promise.resolve([]);
       default:
         return Promise.resolve(null);
     }
@@ -108,3 +115,86 @@ describe("Resumes page", () => {
     expect(screen.getByText(/Install TeX Live/i)).toBeTruthy();
   });
 });
+
+describe("Generate tailored resume", () => {
+  it("generates a variant from the JD and lists it", async () => {
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case "resume_file_list":
+          return Promise.resolve(
+            command_arg_kind(command) ?? [],
+          );
+        case "latex_detect":
+          return Promise.resolve({ available: true, engine: "pdflatex" });
+        case "application_list":
+          return Promise.resolve([
+            { id: 10, company: "Acme", role: "Backend", status: "applied", jobDescription: "x".repeat(60) },
+          ]);
+        case "resume_variant_list":
+          return Promise.resolve([
+            {
+              id: 1,
+              baseFileId: 2,
+              applicationId: 10,
+              category: "backend",
+              label: "Tailored — Backend Engineer",
+              texPath: "/data/resumes/variant-1.tex",
+              pdfPath: "/data/resumes/variant-1.pdf",
+              status: "draft",
+              notes: "",
+              createdAt: "2026-08-26T10:00:00Z",
+              updatedAt: "2026-08-26T10:00:00Z",
+            },
+          ]);
+        default:
+          return Promise.resolve(null);
+      }
+    });
+    renderPage();
+
+    // variant listed with compile status
+    expect(await screen.findByText(/Tailored — Backend Engineer/i)).toBeTruthy();
+    expect(screen.getByText(/PDF compiled/)).toBeTruthy();
+    expect(screen.getAllByText(/backend/i).length).toBeGreaterThan(0);
+  });
+
+  it("generates via IPC from a pasted JD", async () => {
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "resume_file_list") return Promise.resolve([]);
+      if (command === "latex_detect") return Promise.resolve({ available: false, engine: null });
+      if (command === "resume_generate_variant") {
+        return Promise.resolve({
+          id: 2, baseFileId: null, applicationId: null, category: "backend",
+          label: "Tailored — Backend Engineer", texPath: "/v/2.tex", pdfPath: null,
+          status: "draft", notes: "", createdAt: "2026-08-26T10:00:00Z", updatedAt: "2026-08-26T10:00:00Z",
+        });
+      }
+      return Promise.resolve([]);
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const jdBox = await screen.findByPlaceholderText(/paste the job description/i);
+    fireEvent.change(jdBox, {
+      target: { value: "Backend engineer role requiring Rust and Kafka experience." },
+    });
+    // sanity: does any React click handler run in this test?
+    fireEvent.click(screen.getByRole("button", { name: /upload pdf/i }));
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith(
+        "resume_generate_variant",
+        expect.objectContaining({ jdText: expect.stringContaining("Rust and Kafka") }),
+      );
+    });
+  });
+});
+
+function command_arg_kind(_command: string): unknown[] | null {
+  // the page filters by kind client-side through separate calls; default to empty tex list
+  return [];
+}

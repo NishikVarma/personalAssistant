@@ -176,7 +176,7 @@ export default function HistoryCard({ applications, contacts, gmailConnected }: 
           description="Sent emails appear here automatically; replies are found via Sync replies."
         />
       ) : (
-        <ul className="divide-y">
+        <ul className="max-h-96 divide-y overflow-y-auto pr-1">
           {history.map((row) => (
             <li key={row.id} className="flex items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
               {row.direction === "outgoing" ? (
