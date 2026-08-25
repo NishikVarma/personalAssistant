@@ -34,7 +34,7 @@ const GENERATED = {
 
 beforeEach(() => {
   invokeMock.mockReset();
-  invokeMock.mockImplementation((command: string) => {
+  invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
     switch (command) {
       case "generated_email_list":
         return Promise.resolve([EXISTING]);
@@ -48,6 +48,24 @@ beforeEach(() => {
         return Promise.resolve(GENERATED);
       case "generated_email_get":
         return Promise.resolve(EXISTING);
+      case "get_setting":
+        return Promise.resolve(
+          args?.key === "compose.default_role" ? "backend/ai intern" : null,
+        );
+      case "resume_file_list":
+        return Promise.resolve([
+          {
+            id: 5,
+            kind: "pdf_master",
+            originalFilename: "Best_Resume.pdf",
+            storedPath: "/data/resumes/best.pdf",
+            sha256: "aaa",
+            fileSize: 100,
+            notes: "",
+            createdAt: "2026-08-20T00:00:00Z",
+            updatedAt: "2026-08-20T00:00:00Z",
+          },
+        ]);
       default:
         return Promise.resolve(null);
     }
@@ -113,6 +131,33 @@ describe("Emails page", () => {
         id: 7,
         subject: EXISTING.subject,
         body: "Rewritten body",
+      });
+    });
+  });
+});
+
+describe("Compose defaults", () => {
+  it("pre-fills role from saved defaults and saves new ones", async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><Emails /></MemoryRouter>);
+
+    // default role loaded from settings
+    expect(await screen.findByDisplayValue(/backend\/ai intern/i)).toBeTruthy();
+
+    // saving defaults persists current compose values
+    const roleInput = screen.getByLabelText(/role/i);
+    await user.clear(roleInput);
+    await user.type(roleInput, "AI intern");
+    await user.click(screen.getByRole("button", { name: /save as default/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("set_setting", {
+        key: "compose.default_role",
+        value: "AI intern",
+      });
+      expect(invokeMock).toHaveBeenCalledWith("set_setting", {
+        key: "compose.default_email_type",
+        value: "cold_outreach",
       });
     });
   });

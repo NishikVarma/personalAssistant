@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, HardDriveDownload, ShieldCheck, Sparkles, Upload } from "lucide-react";
+import { FileText, HardDriveDownload, ShieldCheck, Sparkles, Star, Upload } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ function FileList({
 
 export default function Resumes() {
   const [pdfs, setPdfs] = useState<ResumeFile[]>([]);
+  const [defaultResumeId, setDefaultResumeId] = useState<number | null>(null);
   const [templates, setTemplates] = useState<ResumeFile[]>([]);
   const [latex, setLatex] = useState<LatexStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +114,33 @@ export default function Resumes() {
   };
 
   useEffect(reload, []);
+
+  useEffect(() => {
+    ipc
+      .getSetting("compose.default_resume_id")
+      .then((v) => v && setDefaultResumeId(Number(v)))
+      .catch(() => {});
+  }, []);
+
+  const setDefaultResume = async (id: number) => {
+    try {
+      await ipc.setSetting("compose.default_resume_id", String(id));
+      setDefaultResumeId(id);
+      toast.success("Default resume set — new drafts attach it automatically");
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  const clearDefaultResume = async () => {
+    try {
+      await ipc.deleteSetting("compose.default_resume_id");
+      setDefaultResumeId(null);
+      toast.success("Default resume cleared");
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
 
   const upload = async (kind: ResumeFileKind) => {
     const isPdf = kind === "pdf_master";
@@ -215,14 +243,30 @@ export default function Resumes() {
               onDelete={remove}
               onView={undefined}
               extraAction={(file) => (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={extractingId !== null}
-                  onClick={() => void extractProfile(file)}
-                >
-                  <Sparkles /> {extractingId === file.id ? "Extracting…" : "Extract profile"}
-                </Button>
+                <>
+                  {defaultResumeId === file.id ? (
+                    <Button variant="ghost" size="xs" onClick={() => void clearDefaultResume()}>
+                      <Star className="fill-yellow-400 text-yellow-400" /> Default
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => void setDefaultResume(file.id)}
+                      title="Attach this resume to new drafts by default"
+                    >
+                      <Star /> Set default
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={extractingId !== null}
+                    onClick={() => void extractProfile(file)}
+                  >
+                    <Sparkles /> {extractingId === file.id ? "Extracting…" : "Extract profile"}
+                  </Button>
+                </>
               )}
             />
           )}

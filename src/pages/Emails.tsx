@@ -33,6 +33,7 @@ import {
   type EmailType,
   type GeneratedEmail,
   type GmailStatus,
+  type ResumeFile,
 } from "@/lib/ipc";
 
 const EMAIL_TYPE_LABELS: Record<EmailType, string> = {
@@ -96,6 +97,8 @@ export default function Emails() {
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
   const [attachmentPath, setAttachmentPath] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [resumeFiles, setResumeFiles] = useState<ResumeFile[]>([]);
+  const [defaultResumeId, setDefaultResumeId] = useState<number | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [forceSend, setForceSend] = useState(false);
@@ -123,6 +126,21 @@ export default function Emails() {
       .status()
       .then(setGmailStatus)
       .catch(() => setGmailStatus(null));
+    ipc.resumeFile
+      .list("pdf_master")
+      .then((rows) => setResumeFiles(Array.isArray(rows) ? rows : []))
+      .catch(() => setResumeFiles([]));
+    ipc
+      .getSetting("compose.default_resume_id")
+      .then((v) => v && setDefaultResumeId(Number(v)))
+      .catch(() => {});
+    // compose defaults so the role/type never need retyping
+    ipc.getSetting("compose.default_role").then((v) => {
+      if (v) setComposeField({ role: v });
+    }).catch(() => {});
+    ipc.getSetting("compose.default_email_type").then((v) => {
+      if (v) setComposeField({ emailType: v as EmailType });
+    }).catch(() => {});
     // a follow-up draft created on the Follow-ups page lands here
     const draftId = (location.state as { draftId?: number } | null)?.draftId;
     if (draftId) {
@@ -197,6 +215,9 @@ export default function Emails() {
     setNotice(null);
     setAttachmentPath(null);
     setAttachmentName(null);
+    if (email.status === "approved") {
+      applyDefaultAttachment(null);
+    }
   };
 
   const dirty =
@@ -242,6 +263,7 @@ export default function Emails() {
       setSelected(updated);
       reloadList();
       if (status === "approved") {
+        applyDefaultAttachment(attachmentPath);
         toast.success("Draft approved — ready to send");
       } else {
         toast.success(`Marked ${STATUS_LABELS[status].toLowerCase()}`);
@@ -252,6 +274,27 @@ export default function Emails() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const saveComposeDefaults = async () => {
+    try {
+      await ipc.setSetting("compose.default_role", compose.role.trim());
+      await ipc.setSetting("compose.default_email_type", compose.emailType);
+      toast.success("Saved as your compose defaults");
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  /** Pre-attaches the default (or most recent) master resume for approved drafts. */
+  const applyDefaultAttachment = (currentPath: string | null) => {
+    if (currentPath) return;
+    const files = resumeFiles.length ? resumeFiles : [];
+    if (files.length === 0) return;
+    const chosen =
+      files.find((f) => f.id === defaultResumeId) ?? files[0]; // list is newest-first
+    setAttachmentPath(chosen.storedPath);
+    setAttachmentName(chosen.originalFilename);
   };
 
   const copyBody = async () => {
@@ -320,14 +363,19 @@ export default function Emails() {
           title="Compose"
           description="The AI writes using only your career profile and these details."
           action={
-            <Button onClick={() => void generate()} disabled={generating}>
-              {generating ? (
-                <Sparkles className="animate-pulse" />
-              ) : (
-                <Wand2 />
-              )}
-              {generating ? "Generating…" : "Generate draft"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => void saveComposeDefaults()}>
+                Save as default
+              </Button>
+              <Button onClick={() => void generate()} disabled={generating}>
+                {generating ? (
+                  <Sparkles className="animate-pulse" />
+                ) : (
+                  <Wand2 />
+                )}
+                {generating ? "Generating…" : "Generate draft"}
+              </Button>
+            </div>
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">
