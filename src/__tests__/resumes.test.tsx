@@ -171,7 +171,6 @@ describe("Generate tailored resume", () => {
       }
       return Promise.resolve([]);
     });
-    const user = userEvent.setup();
     renderPage();
 
     const jdBox = await screen.findByPlaceholderText(/paste the job description/i);
