@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod application;
+pub mod bulk;
 pub mod contact;
 pub mod email;
 pub mod follow_up;
@@ -8,6 +9,7 @@ pub mod resume;
 
 pub use ai::*;
 pub use application::*;
+pub use bulk::*;
 pub use contact::*;
 pub use email::*;
 pub use follow_up::*;

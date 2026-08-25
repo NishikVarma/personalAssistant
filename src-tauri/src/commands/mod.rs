@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod bulk;
 pub mod applications;
 pub mod contacts;
 pub mod emails;

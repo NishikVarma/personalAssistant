@@ -167,3 +167,44 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<bool> {
         .await?;
     Ok(result.rows_affected() > 0)
 }
+
+/// All drafts belonging to a bulk batch, oldest first.
+pub async fn list_by_batch(pool: &SqlitePool, batch_id: i64) -> AppResult<Vec<GeneratedEmail>> {
+    Ok(sqlx::query_as::<_, GeneratedEmail>(
+        "SELECT * FROM generated_emails WHERE bulk_batch_id = ?1 ORDER BY id",
+    )
+    .bind(batch_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub async fn count_by_batch(pool: &SqlitePool, batch_id: i64) -> AppResult<i64> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM generated_emails WHERE bulk_batch_id = ?1",
+    )
+    .bind(batch_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(count)
+}
+
+/// Attaches a draft to a bulk batch (draft status only).
+pub async fn set_bulk_batch_link(
+    pool: &SqlitePool,
+    generated_email_id: i64,
+    batch_id: i64,
+) -> AppResult<()> {
+    let result = sqlx::query(
+        "UPDATE generated_emails SET bulk_batch_id = ?1 WHERE id = ?2 AND status = 'draft'",
+    )
+    .bind(batch_id)
+    .bind(generated_email_id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!(
+            "draft {generated_email_id} (must exist and still be a draft)"
+        )));
+    }
+    Ok(())
+}

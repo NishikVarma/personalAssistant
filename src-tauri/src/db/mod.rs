@@ -1,5 +1,6 @@
 pub mod achievements_repo;
 pub mod applications_repo;
+pub mod bulk_batches_repo;
 pub mod bullets_repo;
 pub mod certifications_repo;
 pub mod contacts_repo;
