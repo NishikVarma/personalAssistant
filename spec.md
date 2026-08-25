@@ -88,9 +88,14 @@ Workflow: `follow_ups` (sequence, scheduled_for, suppression reasons).
 Platform: `settings` (key/value), `oauth_accounts` (provider metadata only — tokens live in
 the OS keyring; Gmail passwords are never stored).
 
+Later migrations layer on top of `0001_init.sql`: recipient columns on `generated_emails`
+and `email_history` (`0002_email_recipients.sql`), `generated_emails.follow_up_id`
+(`0003_follow_up_links.sql`), and the `bulk_batches` table plus
+`generated_emails.bulk_batch_id` (`0004_bulk_batches.sql`).
+
 ## IPC Surface
 
-121 commands registered in `src-tauri/src/lib.rs`:
+122 commands registered in `src-tauri/src/lib.rs`:
 
 - settings (4): get/set/delete_setting, get_app_info
 - profile (43): profile_get/update/set_verified; education/experience/project CRUD +
@@ -113,8 +118,8 @@ the OS keyring; Gmail passwords are never stored).
   profile_import_extracted / resume_match_jd / resume_generate_variant /
   resume_variant_list / resume_variant_tex_content / resume_variant_approve /
   resume_variant_delete
-- bulk (7): bulk_import_preview / batch_create / batch_list / batch_get /
-  generate / batch_remove_draft / batch_finish
+- bulk (8): bulk_import_preview / batch_create / batch_list / batch_get /
+  generate / retry_failed / batch_remove_draft / batch_finish
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -192,6 +197,11 @@ contacts are auto-linked by exact email match.
   draft per valid recipient — grounded in the verified profile with template memory reuse.
 - The review table shows per-recipient status (ready / invalid / duplicate / failed) with
   draft preview, inline removal and exact send counts.
+- `bulk_retry_failed` re-runs only rows whose last generation failed (e.g. provider rate
+  limits), skipping any row that already has a batch draft; results merge back into the
+  review table with fresh counts.
+- An optional resume attachment (pre-selected from the compose default) is applied to
+  every `email_send` in the batch.
 - Sending is **frontend-driven and paced**: explicit confirmation, sequential
   `email_send` calls 2 seconds apart, hard cap of 50 per run (resumable), failures logged
   without aborting. Batch totals and status are persisted (`bulk_batches`).

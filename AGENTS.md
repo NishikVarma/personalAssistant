@@ -55,6 +55,17 @@ Frontend (`src/`):
 - `lib/sections.ts` + `App.tsx` — sidebar registry and route wiring; `lib/notifications.ts`
   (toast system), `lib/theme.ts` (light/dark).
 
+## Key Flows
+
+- **Email send**: `commands/emails.rs::email_send` → repo status checks (approved only) →
+  `gmail/mime.rs` builds RFC 2822 → Gmail REST send → transactional history row +
+  draft `sent` flip + contact last-contacted stamp.
+- **Bulk send**: frontend-paced loop over batch recipients calling `email_send`
+  (2s apart, cap 50/run); failures log without aborting; totals persist via
+  `bulk_batch_finish`; `bulk_retry_failed` re-generates only failed rows that lack drafts.
+- **Reply sync**: `gmail_sync_replies` polls threads of awaiting sends; incoming messages
+  become `email_history` rows, sent rows flip to `replied`, pending follow-ups suppress.
+
 ## Adding a New Entity (checklist)
 
 1. Model + input struct in `src-tauri/src/models/<domain>.rs` (derive Serialize, Deserialize,
