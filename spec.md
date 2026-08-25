@@ -112,6 +112,8 @@ the OS keyring; Gmail passwords are never stored).
 - resumes (8): resume_file_upload (content-addressed, dedup) / list / delete /
   tex_content / latex_detect / extract_profile / extract_from_text /
   profile_import_extracted
+- resume matching & variants (7): resume_match_jd / resume_generate_variant /
+  resume_variant_list / tex_content / approve / delete
 
 Frontend wrappers mirror these in `src/lib/ipc.ts` under `ipc.{domain}.{action}`.
 
@@ -167,6 +169,19 @@ contacts are auto-linked by exact email match.
   structured `ExtractedProfile`. The review UI lets you edit, untick and import; approved
   items are created through the standard profile repos **marked verified**.
 
+## JD Matching & Tailored Generation (implemented)
+
+- `resume_match_jd` analyzes a job description against the verified profile: role,
+  seniority, required/preferred skills, **matched skills (only from the profile)** and
+  honest missing-skill gaps, plus a recommended resume category.
+- `resume_generate_variant` projects the verified profile into the user's .tex template
+  (structure preserved, anti-fabrication rules enforced), writes `variants/{id}.tex` and
+  compiles to PDF via the detected engine — `.tex`-only fallback otherwise. Variants are
+  linked to applications, reviewable and approvable on the Resumes page.
+- Compose integration: drafts pre-attach the user's default resume (set per PDF on the
+  Resumes page); the editor can auto-match the best variant from the linked application's
+  JD. Compose defaults (role + email type) are saved once and reused.
+
 ## Follow-up System (implemented)
 
 - Every sent email linked to an application auto-schedules a follow-up (+N days,
@@ -213,7 +228,9 @@ Development plan from the original project brief — 17 incremental steps:
 | 11 | Resume PDF import                               | Done   |
 | 12 | Career profile extraction/verification          | Done   |
 | 13 | LaTeX template import                           | Done   |
-| 14 | Resume generation                               | Next   |
+| 14 | Resume generation                               | Done   |
+| 15 | Resume/JD matching                              | Done   |
+| 16 | Bulk CSV/XLSX outreach                          | Next   |
 | 10 | Follow-up scheduling/notifications              | –      |
 | 11 | Resume PDF import                               | –      |
 | 12 | Career profile extraction/verification          | –      |
