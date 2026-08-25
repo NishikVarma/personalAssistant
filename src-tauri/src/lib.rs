@@ -140,6 +140,12 @@ pub fn run() {
             commands::resumes::resume_extract_profile,
             commands::resumes::resume_extract_from_text,
             commands::resumes::profile_import_extracted,
+            commands::resumes::resume_match_jd,
+            commands::resumes::resume_generate_variant,
+            commands::resumes::resume_variant_list,
+            commands::resumes::resume_variant_tex_content,
+            commands::resumes::resume_variant_approve,
+            commands::resumes::resume_variant_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

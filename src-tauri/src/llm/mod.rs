@@ -1,5 +1,6 @@
 pub mod email_prompt;
 pub mod extract_prompt;
+pub mod jd_prompt;
 pub mod secrets;
 
 use std::time::Duration;

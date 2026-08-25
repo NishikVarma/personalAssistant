@@ -429,3 +429,204 @@ pub async fn profile_import_extracted_inner(
 
     Ok(counts)
 }
+
+// ---------- JD matching & tailored generation ----------
+
+use crate::db::{profile_snapshot, resume_variants_repo};
+use crate::llm::jd_prompt;
+use crate::models::resume::{JdAnalysis, ResumeVariant};
+
+/// Analyzes a job description against the verified career profile.
+#[tauri::command]
+pub async fn resume_match_jd(
+    state: State<'_, AppState>,
+    jd_text: String,
+) -> AppResult<JdAnalysis> {
+    let jd = jd_text.trim();
+    if jd.len() < 40 {
+        return Err(AppError::InvalidInput(
+            "paste a fuller job description (at least 40 characters)".to_string(),
+        ));
+    }
+    let profile_block = profile_snapshot::collect(&state.pool).await?;
+    let provider = super::ai::current_provider(&state).await?;
+    let prompt = jd_prompt::build_match_prompt(jd, &profile_block);
+    let raw = provider.complete(prompt).await?;
+    jd_prompt::parse_jd_analysis(&raw)
+}
+
+/// Compiles a .tex file with the detected engine. Returns the PDF path on
+/// success, None when no engine is installed or compilation fails.
+async fn compile_tex(tex_path: &Path) -> AppResult<Option<PathBuf>> {
+    for engine in ["pdflatex", "xelatex", "tectonic"] {
+        let probe = tokio::process::Command::new(engine)
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await;
+        if !matches!(probe, Ok(status) if status.success()) {
+            continue;
+        }
+
+        let dir = tex_path
+            .parent()
+            .ok_or_else(|| AppError::InvalidInput("invalid tex path".to_string()))?;
+        let pdf_path = tex_path.with_extension("pdf");
+        let output = tokio::process::Command::new(engine)
+            .arg("-interaction=nonstopmode")
+            .arg("-output-directory")
+            .arg(dir)
+            .arg(tex_path)
+            .current_dir(dir)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await;
+
+        if matches!(output, Ok(status) if status.success()) && pdf_path.is_file() {
+            return Ok(Some(pdf_path));
+        }
+        return Ok(None); // engine present but compilation failed — tex-only fallback
+    }
+    Ok(None) // no engine installed
+}
+
+/// Generates a tailored LaTeX resume from the user's template, verified
+/// profile and a job description. Compiles to PDF when LaTeX is available.
+#[tauri::command]
+pub async fn resume_generate_variant(
+    state: State<'_, AppState>,
+    jd_text: String,
+    template_id: Option<i64>,
+    application_id: Option<i64>,
+) -> AppResult<ResumeVariant> {
+    let jd = jd_text.trim().to_string();
+    if jd.len() < 40 {
+        return Err(AppError::InvalidInput(
+            "paste a fuller job description (at least 40 characters)".to_string(),
+        ));
+    }
+
+    let template = match template_id {
+        Some(id) => Some(resume_files_repo::get(&state.pool, id).await?),
+        None => resume_files_repo::list(&state.pool, Some(ResumeFileKind::TexTemplate))
+            .await?
+            .into_iter()
+            .next(),
+    };
+    let template = template
+        .ok_or_else(|| AppError::InvalidInput("upload a .tex template first".to_string()))?;
+    if template.kind != ResumeFileKind::TexTemplate.as_str() {
+        return Err(AppError::InvalidInput(
+            "the selected file is not a .tex template".to_string(),
+        ));
+    }
+
+    let profile_block = profile_snapshot::collect(&state.pool).await?;
+    let provider = super::ai::current_provider(&state).await?;
+    let analysis: JdAnalysis = {
+        let prompt = jd_prompt::build_match_prompt(&jd, &profile_block);
+        let raw = provider.complete(prompt).await?;
+        jd_prompt::parse_jd_analysis(&raw)?
+    };
+    let category = analysis
+        .recommended_category
+        .as_deref()
+        .and_then(crate::models::resume::ResumeCategory::try_from_str)
+        .unwrap_or(crate::models::resume::ResumeCategory::GeneralSwe);
+
+    let template_tex = tokio::fs::read_to_string(&template.stored_path)
+        .await
+        .map_err(|e| AppError::InvalidInput(format!("could not read template: {e}")))?;
+    let gen_prompt = jd_prompt::build_generation_prompt(
+        &template_tex,
+        &profile_block,
+        &jd,
+        Some(category.as_str()),
+    );
+    let raw = provider.complete(gen_prompt).await?;
+    let latex = jd_prompt::strip_latex_fences(&raw);
+    if !latex.contains("\\documentclass") {
+        return Err(AppError::InvalidInput(
+            "the AI response was not valid LaTeX — try regenerating".to_string(),
+        ));
+    }
+
+    let label = if analysis.role.is_empty() {
+        "Tailored resume".to_string()
+    } else {
+        format!("Tailored — {}", analysis.role)
+    };
+    let variant = resume_variants_repo::create(
+        &state.pool,
+        Some(template.id),
+        application_id,
+        category,
+        &label,
+    )
+    .await?;
+
+    let tex_path = state.resumes_dir.join(format!("variant-{}.tex", variant.id));
+    tokio::fs::write(&tex_path, &latex)
+        .await
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+
+    let pdf_path = compile_tex(&tex_path).await?;
+    let tex_str = tex_path.to_string_lossy().into_owned();
+    let pdf_str = pdf_path.as_ref().map(|p| p.to_string_lossy().into_owned());
+    resume_variants_repo::set_paths(
+        &state.pool,
+        variant.id,
+        Some(&tex_str),
+        pdf_str.as_deref(),
+    )
+    .await?;
+
+    let mut variant = variant;
+    variant.tex_path = Some(tex_path.to_string_lossy().into_owned());
+    variant.pdf_path = pdf_path.as_ref().map(|p| p.to_string_lossy().into_owned());
+    Ok(variant)
+}
+
+#[tauri::command]
+pub async fn resume_variant_list(
+    state: State<'_, AppState>,
+    application_id: Option<i64>,
+) -> AppResult<Vec<ResumeVariant>> {
+    resume_variants_repo::list(&state.pool, application_id).await
+}
+
+#[tauri::command]
+pub async fn resume_variant_tex_content(
+    state: State<'_, AppState>,
+    id: i64,
+) -> AppResult<String> {
+    let variant = resume_variants_repo::get(&state.pool, id).await?;
+    let tex_path = variant
+        .tex_path
+        .ok_or_else(|| AppError::InvalidInput("this variant has no .tex source".to_string()))?;
+    tokio::fs::read_to_string(&tex_path)
+        .await
+        .map_err(|e| AppError::InvalidInput(format!("could not read variant: {e}")))
+}
+
+#[tauri::command]
+pub async fn resume_variant_approve(
+    state: State<'_, AppState>,
+    id: i64,
+) -> AppResult<ResumeVariant> {
+    resume_variants_repo::approve(&state.pool, id).await
+}
+
+/// Deletes a variant and its stored .tex/.pdf files.
+#[tauri::command]
+pub async fn resume_variant_delete(state: State<'_, AppState>, id: i64) -> AppResult<bool> {
+    let (tex_path, pdf_path) = resume_variants_repo::delete(&state.pool, id).await?;
+    for path in [tex_path, pdf_path].into_iter().flatten() {
+        if let Err(e) = tokio::fs::remove_file(&path).await {
+            eprintln!("stored file already gone ({path}): {e}");
+        }
+    }
+    Ok(true)
+}

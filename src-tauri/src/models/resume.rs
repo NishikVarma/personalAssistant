@@ -2,6 +2,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::profile::str_enum;
 
+str_enum!(ResumeVariantStatus {
+    Draft => "draft",
+    Approved => "approved",
+    Archived => "archived",
+});
+
+str_enum!(ResumeCategory {
+    Backend => "backend",
+    AiMl => "ai_ml",
+    FullStack => "full_stack",
+    GeneralSwe => "general_swe",
+    Other => "other",
+});
+
 str_enum!(ResumeFileKind {
     PdfMaster => "pdf_master",
     TexTemplate => "tex_template",
@@ -116,4 +130,33 @@ pub struct ExtractedLink {
     pub label: String,
     pub url: String,
     pub kind: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumeVariant {
+    pub id: i64,
+    pub base_file_id: Option<i64>,
+    pub application_id: Option<i64>,
+    pub category: String,
+    pub label: String,
+    pub tex_path: Option<String>,
+    pub pdf_path: Option<String>,
+    pub status: String,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// AI analysis of a job description against the verified career profile.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct JdAnalysis {
+    pub role: String,
+    pub seniority: String,
+    pub required_skills: Vec<String>,
+    pub preferred_skills: Vec<String>,
+    pub matched_skills: Vec<String>,
+    pub missing_skills: Vec<String>,
+    pub recommended_category: Option<String>,
 }
