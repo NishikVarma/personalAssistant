@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Layers, Send, Sparkles, Upload } from "lucide-react";
+import { Layers, RefreshCw, Send, Sparkles, Upload } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import DeleteButton from "@/components/profile/DeleteButton";
@@ -27,6 +27,7 @@ import {
   type BulkImportPreview,
   type BulkRowStatus,
   type EmailType,
+  type ResumeFile,
 } from "@/lib/ipc";
 
 const EMAIL_TYPE_LABELS: Record<EmailType, string> = {
@@ -89,12 +90,44 @@ export default function Bulk() {
   const [sendProgress, setSendProgress] = useState<{ done: number; total: number } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [previewDraft, setPreviewDraft] = useState<{ subject: string; body: string } | null>(null);
+  const [resumeFiles, setResumeFiles] = useState<ResumeFile[]>([]);
+  const [defaultResumeId, setDefaultResumeId] = useState<number | null>(null);
+  const [attachment, setAttachment] = useState<{ path: string; name: string } | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  useEffect(() => {
+    loadApplications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadApplications = () => {
     ipc.application
       .list()
       .then((rows) => setApplications(Array.isArray(rows) ? rows : []))
       .catch(() => setApplications([]));
+    ipc.resumeFile
+      .list("pdf_master")
+      .then((rows) => {
+        const files = Array.isArray(rows) ? rows : [];
+        setResumeFiles(files);
+        // pre-select the default resume (fallback: most recent)
+        ipc
+          .getSetting("compose.default_resume_id")
+          .then((v) => {
+            const defaultId = v ? Number(v) : null;
+            setDefaultResumeId(defaultId);
+            const chosen =
+              files.find((f) => f.id === defaultId) ?? files[0];
+            if (chosen) {
+              setAttachment({ path: chosen.storedPath, name: chosen.originalFilename });
+            }
+          })
+          .catch(() => {
+            const chosen = files[0];
+            if (chosen) setAttachment({ path: chosen.storedPath, name: chosen.originalFilename });
+          });
+      })
+      .catch(() => setResumeFiles([]));
   };
 
   const pickFile = async () => {
@@ -149,6 +182,34 @@ export default function Bulk() {
     }
   };
 
+  const retryFailed = async () => {
+    if (!batch) return;
+    setRetrying(true);
+    try {
+      const retried = await ipc.bulk.retryFailed(batch.id, sourcePath, mapping, {
+        role: null,
+        company: null,
+        jobDescription: null,
+      });
+      const list = Array.isArray(retried) ? retried : [];
+      // merge: replace rows we just retried, keep ready rows untouched
+      setRows((prev) => {
+        const byEmail = new Map(list.map((r) => [r.email.toLowerCase(), r]));
+        return prev.map((row) => {
+          if (row.status !== "failed" && row.status !== "invalid") return row;
+          const updated = byEmail.get(row.email.toLowerCase());
+          return updated ?? row;
+        });
+      });
+      const nowReady = list.filter((r) => r.status === "ready").length;
+      toast.success(`Retried ${list.length} recipient${list.length === 1 ? "" : "s"} — ${nowReady} now ready`);
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const removeRecipient = async (row: BulkRowStatus) => {
     if (!batch || !row.generatedEmailId) return;
     try {
@@ -183,7 +244,11 @@ export default function Bulk() {
       if (!row.generatedEmailId) continue;
       try {
         await ipc.generatedEmail.setStatus(row.generatedEmailId, "approved");
-        await ipc.generatedEmail.send(row.generatedEmailId, null, false);
+        await ipc.generatedEmail.send(
+          row.generatedEmailId,
+          attachment ? attachment.path : null,
+          false,
+        );
         sent += 1;
       } catch (e) {
         failed += 1;
@@ -358,14 +423,53 @@ export default function Bulk() {
             title={`3. Review recipients${readyRows.length ? ` — ${readyRows.length} ready` : ""}`}
             description="Preview, remove, then send. Sends are paced 2 seconds apart, max 50 per run."
             action={
-              <Button
-                disabled={sending || sendable.length === 0}
-                onClick={() => setConfirmOpen(true)}
-              >
-                <Send /> Send {sendable.length} email{sendable.length === 1 ? "" : "s"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {rows.some((r) => r.status === "failed") ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={retrying || generating}
+                    onClick={() => void retryFailed()}
+                  >
+                    <RefreshCw className={retrying ? "animate-spin" : undefined} />
+                    {retrying ? "Retrying…" : `Retry failed (${rows.filter((r) => r.status === "failed").length})`}
+                  </Button>
+                ) : null}
+                <Button
+                  disabled={sending || sendable.length === 0}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  <Send /> Send {sendable.length} email{sendable.length === 1 ? "" : "s"}
+                </Button>
+              </div>
             }
           >
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Label htmlFor="bulk-attach" className="text-xs">Attach resume</Label>
+              {resumeFiles.length > 0 ? (
+                <Select
+                  id="bulk-attach"
+                  className="h-7 w-56 text-xs"
+                  value={attachment && resumeFiles.some((f) => f.storedPath === attachment.path) ? attachment.path : ""}
+                  onChange={(e) => {
+                    const file = resumeFiles.find((f) => f.storedPath === e.target.value);
+                    setAttachment(file ? { path: file.storedPath, name: file.originalFilename } : null);
+                  }}
+                >
+                  <option value="">No attachment</option>
+                  {resumeFiles.map((file) => (
+                    <option key={file.id} value={file.storedPath}>
+                      {file.originalFilename}
+                      {file.id === defaultResumeId ? " (default)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  No master resumes uploaded — upload one on the Resumes page to attach.
+                </span>
+              )}
+            </div>
             {sending && sendProgress ? (
               <div className="mb-4 space-y-1.5">
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -461,6 +565,13 @@ export default function Bulk() {
                 They will be sent one by one, 2 seconds apart, to the exact recipients listed
                 above. This cannot be undone.
               </DialogDescription>
+              {attachment ? (
+                <p className="text-xs text-muted-foreground">
+                  Resume attached: <span className="font-medium">{attachment.name}</span>
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No resume will be attached.</p>
+              )}
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={sending}>

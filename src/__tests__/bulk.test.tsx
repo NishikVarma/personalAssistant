@@ -74,7 +74,7 @@ function renderPage() {
 beforeEach(() => {
   invokeMock.mockReset();
   openMock.mockReset();
-  invokeMock.mockImplementation((command: string) => {
+  invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
     switch (command) {
       case "bulk_import_preview":
         return Promise.resolve(PREVIEW);
@@ -102,6 +102,27 @@ beforeEach(() => {
         return Promise.resolve({ id: 1, status: "sent" });
       case "application_list":
         return Promise.resolve([]);
+      case "resume_file_list":
+        return Promise.resolve([
+          {
+            id: 7,
+            kind: "pdf_master",
+            originalFilename: "Best_Resume.pdf",
+            storedPath: "/data/resumes/best.pdf",
+            sha256: "abc",
+            fileSize: 100,
+            notes: "",
+            createdAt: "2026-08-20T00:00:00Z",
+            updatedAt: "2026-08-20T00:00:00Z",
+          },
+        ]);
+      case "get_setting":
+        return Promise.resolve(args?.key === "compose.default_resume_id" ? "7" : null);
+      case "bulk_retry_failed":
+        return Promise.resolve([
+          { ...ROW_STATUSES[0], status: "ready", generatedEmailId: 12 },
+          ROW_STATUSES[1],
+        ]);
       default:
         return Promise.resolve(null);
     }
@@ -183,10 +204,99 @@ describe("Bulk outreach", () => {
       });
       expect(invokeMock).toHaveBeenCalledWith("email_send", {
         id: 11,
-        attachmentPath: null,
+        attachmentPath: "/data/resumes/best.pdf",
         force: false,
       });
       expect(invokeMock).toHaveBeenCalledWith("bulk_batch_finish", { id: 1, status: "sent" });
+    });
+  });
+});
+
+describe("Bulk retry and attachments", () => {
+  it("pre-selects the default resume as attachment", async () => {
+    openMock.mockResolvedValue("/data/contacts.csv");
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /choose file/i }));
+    await user.click(await screen.findByRole("button", { name: /create batch & generate/i }));
+
+    const select = await screen.findByLabelText(/attach resume/i) as HTMLSelectElement;
+    expect(select.value).toBe("/data/resumes/best.pdf");
+  });
+
+  it("retries failed rows and merges the results", async () => {
+    openMock.mockResolvedValue("/data/contacts.csv");
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case "bulk_import_preview":
+          return Promise.resolve(PREVIEW);
+        case "bulk_batch_create":
+          return Promise.resolve({
+            id: 1,
+            emailType: "cold_outreach",
+            applicationId: null,
+            status: "draft",
+            totalCount: 0,
+            sentCount: 0,
+            failedCount: 0,
+            createdAt: "2026-08-26T10:00:00Z",
+            updatedAt: "2026-08-26T10:00:00Z",
+          });
+        // simulate a rate-limited generation: Jane ready, Bob failed
+        case "bulk_generate":
+          return Promise.resolve([
+            ROW_STATUSES[0],
+            { ...ROW_STATUSES[1], status: "failed", detail: "rate limit exceeded" },
+          ]);
+        // retry succeeds for Bob only (Jane already has a draft)
+        case "bulk_retry_failed":
+          return Promise.resolve([
+            { ...ROW_STATUSES[1], status: "ready", generatedEmailId: 12 },
+          ]);
+        case "generated_email_get":
+          return Promise.resolve(SENT_DRAFT);
+        case "application_list":
+          return Promise.resolve([]);
+        default:
+          return Promise.resolve(null);
+      }
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /choose file/i }));
+    await user.click(await screen.findByRole("button", { name: /create batch & generate/i }));
+
+    const retryButton = await screen.findByRole("button", { name: /retry failed \(1\)/i });
+    await user.click(retryButton);
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith(
+        "bulk_retry_failed",
+        expect.objectContaining({ batchId: 1 }),
+      );
+    });
+    // the retried row is now ready with a fresh draft
+    expect(await screen.findByText(/2 ready/i)).toBeTruthy();
+  });
+
+  it("passes the selected resume path to each send", async () => {
+    openMock.mockResolvedValue("/data/contacts.csv");
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /choose file/i }));
+    await user.click(await screen.findByRole("button", { name: /create batch & generate/i }));
+    await user.click(await screen.findByRole("button", { name: /send 1 email/i }));
+    await user.click(await screen.findByRole("button", { name: /confirm & send/i }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("email_send", {
+        id: 11,
+        attachmentPath: "/data/resumes/best.pdf",
+        force: false,
+      });
     });
   });
 });

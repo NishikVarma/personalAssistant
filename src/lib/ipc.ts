@@ -854,6 +854,12 @@ export const ipc = {
       mapping: BulkColumnMapping,
       config: BulkGenerateConfig,
     ) => invoke<BulkRowStatus[]>("bulk_generate", { batchId, sourcePath, mapping, config }),
+    retryFailed: (
+      batchId: number,
+      sourcePath: string,
+      mapping: BulkColumnMapping,
+      config: BulkGenerateConfig,
+    ) => invoke<BulkRowStatus[]>("bulk_retry_failed", { batchId, sourcePath, mapping, config }),
     removeDraft: (batchId: number, draftId: number) =>
       invoke<boolean>("bulk_batch_remove_draft", { batchId, draftId }),
     batchFinish: (id: number, status: "sent" | "failed") =>
